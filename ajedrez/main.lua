@@ -7,16 +7,31 @@ SEMITONE_VALUES = {
 	["G#"] = 8, ["A-"] = 9, ["A#"] = 10,["B-"] = 11,
 }
 ACTIVE_CHANNELS = { 
-	false, true,  true,  true,  true,  true,  true, 
-	true,  true,  true,  false, false, false, false,
+	false, true,  false,  false,  false,  false,  false, 
+	false,  false,  false,  false, false, false, false, -- starting fourth in this row are drums
 	false, false, true,  true,  true,  true,  true,
 	false, false, false, false, false, false, false
 }
 
--- visual properties
-NOTE_HEIGHT = 4;
+OCTAVE_DIFFS = {
+	0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, -2, -2, -2, -2, -2, 0, 0, 0, 0, 0, 0, 0
+}
 
-function love.load()		
+-- visual properties
+-- how many intermediate rectangles to draw between the notes in a bend
+BEND_SEGMENTS = 1;
+SEGMENT_WIDTH = 2;
+
+PIANOROLL_ZOOMX = 1;
+PIANOROLL_ZOOMY = 8;
+PIANOROLL_SCROLLX = 0;
+PIANOROLL_SCROLLY = 0;
+
+function love.load()
+	love.window.setTitle("Music Visualizer");
+	success = love.window.setMode( 800, 800, {resizable=true, minwidth=800, minheight=600} )
+	
 	local inlines = {};
 	for line in io.lines("data/rrr.txt") do
 		table.insert(inlines, line)
@@ -57,14 +72,14 @@ function love.load()
 		currentnote[j] = {};
 	end
 	
-	for i = 1, 4 do
-		print("parsing pattern " .. PATTERN_ORDER[i]);
+	for i = 1, 64 do
+		--print("parsing pattern " .. PATTERN_ORDER[i]);
 		-- this first line only indicates the number of rows to the pattern
 		-- TODO: I assumed that every line is 64 rows long, which in reality can vary freely
 		local ptrnstrtlinenum = 3 + (65 * PATTERN_ORDER[i]);
 		local ptrnstrtline = inlines[ptrnstrtlinenum];
 		local rowcount = string.sub(ptrnstrtline, 7);
-		print("rows: " .. rowcount);
+		--print("rows: " .. rowcount);
 		
 		for j = 1, rowcount do
 			local currentline = inlines[ptrnstrtlinenum + j]
@@ -94,6 +109,7 @@ function parseLine(patternpos, patternsize, rowpos, rowdata)
 	
 	for i = 1, #rowdata do
 		local currchar = (string.sub(rowdata,i,i));
+		local currtick = (64 * (patternpos - 1) * TICKS_PER_ROW) + ((rowpos - 1) * TICKS_PER_ROW)
 		
 		if currchar == "|" then
 			channelnum = channelnum + 1;
@@ -105,14 +121,13 @@ function parseLine(patternpos, patternsize, rowpos, rowdata)
 				local lastchar = (string.sub(rowdata, i-1, i-1));
 				local pitchclassstring = lastchar .. currchar;
 				
-				local currtick = (64 * (patternpos - 1) * TICKS_PER_ROW) + ((rowpos - 1) * TICKS_PER_ROW)
-				
 				if pitchclassstring == ".." then
 				
 				-- note cuts and releases end the current note of the given channel
 				elseif pitchclassstring == "==" or pitchclassstring == "^^" then
 					if currentnote[channelnum] then
 						currentnote[channelnum].endtick = currtick;
+						currentnote[channelnum] = nil;
 					end
 				
 				-- PLACE A NOTE if something is here in the first two columns of the channel
@@ -124,16 +139,18 @@ function parseLine(patternpos, patternsize, rowpos, rowdata)
 					-- puts an endtick on notes that continue right up till the onset of the next one
 					if currentnote[channelnum] then
 						currentnote[channelnum].endtick = currtick;
+						currentnote[channelnum] = nil;
 					end
 					
-					print(pitchclassstring);
+					--print(pitchclassstring);
 					local NewNote = {
 						pitchclass = SEMITONE_VALUES[pitchclassstring],
 						octave = nextchar,
 						starttick = currtick,
 						-- absurdly large default value which will be inevitably trimmed
 						-- this, I guess, is better than leaving it nil and having to check for nil
-						endtick  = 100000000
+						endtick  = 100000000,
+						bends = {}
 					};
 					currentnote[channelnum] = NewNote;
 					table.insert(CHANNELS[channelnum], NewNote);
@@ -144,6 +161,27 @@ function parseLine(patternpos, patternsize, rowpos, rowdata)
 			-- so it gets its own section down here
 			if charsincepipe == 9 then
 			
+				-- the digits will be in hex, so we have to convert now
+				local nextchar     = (string.sub(rowdata, i+1, i+1));
+				local nextnextchar = (string.sub(rowdata, i+2, i+2));
+				local pbparamhex   = nextchar .. nextnextchar;
+				local pbparam	   = tonumber(pbparamhex, 16);
+			
+				-- PITCH BEND UP
+				if currchar == "F" then
+					if currentnote[channelnum] then
+						local semitones = math.floor(pbparam / 8)
+						local newbend = { semitones, currtick }
+						table.insert(currentnote[channelnum].bends, newbend);
+					end
+				-- PITCH BEND DOWN
+				elseif currchar == "E" then
+					if currentnote[channelnum] then
+						local semitones = -math.floor(pbparam / 8)
+						local newbend = { semitones, currtick }
+						table.insert(currentnote[channelnum].bends, newbend);
+					end
+				end
 			end
 		end
 	end
@@ -153,20 +191,69 @@ function love.update()
 
 end
 
+function love.mousemoved( x, y, dx, dy, istouch )
+	-- middle click and dragging: pans the view
+	if love.mouse.isDown( 3 ) then
+		PIANOROLL_SCROLLX = PIANOROLL_SCROLLX - (dx / PIANOROLL_ZOOMX);
+		PIANOROLL_SCROLLY = PIANOROLL_SCROLLY - (dy / PIANOROLL_ZOOMY);
+	end
+end
+
 function love.draw()
-	local wh = love.graphics.getHeight();
+	WINDOW_WIDTH  = love.graphics.getWidth();
+	WINDOW_HEIGHT = love.graphics.getHeight();
+
+	-- beat marks
+	for i = 1, 32 do
+		love.graphics.line(i*32*3 - (PIANOROLL_SCROLLX%96), 0, i*32*3 - (PIANOROLL_SCROLLX%96), WINDOW_HEIGHT);
+	end
 
 	for ch = 1, CHANNELCOUNT do
 		if ACTIVE_CHANNELS[ch] then
 			for i = 1, #CHANNELS[ch] do
-				local currnote = CHANNELS[ch][i]
-				local notelength = currnote.endtick - currnote.starttick;
-				local pitch = (12 * currnote.octave) + currnote.pitchclass;
-				
-				local notey = wh - (pitch * NOTE_HEIGHT);
-					
-				love.graphics.rectangle("fill", currnote.starttick, notey, notelength, NOTE_HEIGHT);
-		end
+				drawNote(ch, i);
+			end
 		end
 	end
+end
+
+function drawNote(chnum, notenum)
+	local currnote = CHANNELS[chnum][notenum];
+	local notelength = currnote.endtick - currnote.starttick;
+	-- base pitch before any bends
+	local pitch = (12 * (currnote.octave + OCTAVE_DIFFS[chnum])) + currnote.pitchclass;
+	local cx = currnote.starttick
+	
+	if #currnote.bends > 0 then
+		for i = 1, #currnote.bends do
+			local cb = currnote.bends[i];
+			
+			-- first, the rectangle that comes before the bend
+			local rectwidth = (cb[2] - cx) * PIANOROLL_ZOOMX;
+			local recty = pianoroll_tray(pitch);
+			love.graphics.rectangle("fill", pianoroll_trax(cx), recty, rectwidth, PIANOROLL_ZOOMY);
+			
+			pitch = pitch + cb[1];
+			cx = cb[2]
+			
+			-- after the last bend, we draw one more rect to the end of the note
+			if i == #currnote.bends then
+				local rectwidth = (currnote.endtick - cx) * PIANOROLL_ZOOMX;
+				local recty = pianoroll_tray(pitch);
+				love.graphics.rectangle("fill", pianoroll_trax(cx), recty, rectwidth, PIANOROLL_ZOOMY);
+			end
+		end
+		
+		return
+	end
+	local rectx = pianoroll_trax(currnote.starttick);
+	local recty = pianoroll_tray(pitch);
+	love.graphics.rectangle("fill", rectx, recty, notelength * PIANOROLL_ZOOMX, PIANOROLL_ZOOMY);
+end
+
+function pianoroll_trax(x)
+	return PIANOROLL_ZOOMX * (x - PIANOROLL_SCROLLX) + (WINDOW_WIDTH / 2); 
+end
+function pianoroll_tray(y)
+	return PIANOROLL_ZOOMY * (60 - y - PIANOROLL_SCROLLY ) + (WINDOW_HEIGHT / 2); 
 end
