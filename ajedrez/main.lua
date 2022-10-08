@@ -7,7 +7,7 @@ SEMITONE_VALUES = {
 	["G#"] = 8, ["A-"] = 9, ["A#"] = 10,["B-"] = 11,
 }
 ACTIVE_CHANNELS = { 
-	false, true,  false,  false,  false,  false,  false, 
+	false, true,  true,  true,  true,  true,  false, 
 	false,  false,  false,  false, false, false, false, -- starting fourth in this row are drums
 	false, false, true,  true,  true,  true,  true,
 	false, false, false, false, false, false, false
@@ -23,10 +23,34 @@ OCTAVE_DIFFS = {
 BEND_SEGMENTS = 1;
 SEGMENT_WIDTH = 2;
 
-PIANOROLL_ZOOMX = 1;
-PIANOROLL_ZOOMY = 8;
+PIANOROLL_ZOOMX = {3, 2.5};
+PIANOROLL_ZOOMY = {16, 12};
 PIANOROLL_SCROLLX = 0;
 PIANOROLL_SCROLLY = 0;
+
+PARALLAX_LAYERS = {
+	1, 2, 2, 2, 2, 2, 2,
+	2, 2, 2, 1, 1, 1, 1,
+	1, 1, 1, 1, 1, 1, 1,
+	1, 1, 1, 1, 1, 1, 1
+}
+COLORS = {
+	WHITE		= {1,	1,	1},
+	PURPLE		= {0,	0,	0.5},
+	LAVENDER	= {0.5,	0,	0.5},
+	RED			= {1, 0, 0},
+	YELLOW		= {1, 1, 0},
+	GREEN		= {0, 1, 0},
+	BLUE		= {0, 1, 1}
+}
+CHANNEL_COLORS = {
+	COLORS.WHITE, COLORS.PURPLE, COLORS.LAVENDER, COLORS.LAVENDER, COLORS.LAVENDER, COLORS.LAVENDER, COLORS.LAVENDER,
+	COLORS.LAVENDER, COLORS.LAVENDER, COLORS.LAVENDER, COLORS.LAVENDER, COLORS.LAVENDER, COLORS.LAVENDER, COLORS.LAVENDER,
+	COLORS.LAVENDER, COLORS.LAVENDER, COLORS.RED, COLORS.YELLOW, COLORS.GREEN, COLORS.BLUE
+}
+
+-- playback properties
+playing = false
 
 function love.load()
 	love.window.setTitle("Music Visualizer");
@@ -72,7 +96,7 @@ function love.load()
 		currentnote[j] = {};
 	end
 	
-	for i = 1, 64 do
+	for i = 1, 96 do
 		--print("parsing pattern " .. PATTERN_ORDER[i]);
 		-- this first line only indicates the number of rows to the pattern
 		-- TODO: I assumed that every line is 64 rows long, which in reality can vary freely
@@ -187,15 +211,23 @@ function parseLine(patternpos, patternsize, rowpos, rowdata)
 	end
 end
 
-function love.update()
+function love.keypressed(key, scancode, isrepeat)
+	if key == "space" then
+		playing = not playing;
+	end
+end
 
+function love.update()
+	if playing then
+		PIANOROLL_SCROLLX = PIANOROLL_SCROLLX + 1.866666;
+	end
 end
 
 function love.mousemoved( x, y, dx, dy, istouch )
 	-- middle click and dragging: pans the view
 	if love.mouse.isDown( 3 ) then
-		PIANOROLL_SCROLLX = PIANOROLL_SCROLLX - (dx / PIANOROLL_ZOOMX);
-		PIANOROLL_SCROLLY = PIANOROLL_SCROLLY - (dy / PIANOROLL_ZOOMY);
+		PIANOROLL_SCROLLX = PIANOROLL_SCROLLX - (dx / PIANOROLL_ZOOMX[1]);
+		PIANOROLL_SCROLLY = PIANOROLL_SCROLLY - (dy / PIANOROLL_ZOOMY[1]);
 	end
 end
 
@@ -203,11 +235,26 @@ function love.draw()
 	WINDOW_WIDTH  = love.graphics.getWidth();
 	WINDOW_HEIGHT = love.graphics.getHeight();
 
+	love.graphics.setColor(1,1,1)
 	-- beat marks
-	for i = 1, 32 do
-		love.graphics.line(i*32*3 - (PIANOROLL_SCROLLX%96), 0, i*32*3 - (PIANOROLL_SCROLLX%96), WINDOW_HEIGHT);
+	local pixelsperbeat = ((TICKS_PER_ROW * 32) * 2)
+	for i = -16, 16 do
+		local linex = i * pixelsperbeat - ((PIANOROLL_SCROLLX * PIANOROLL_ZOOMX[1]) % pixelsperbeat) + WINDOW_WIDTH/2;
+		love.graphics.line(linex, 0, linex, WINDOW_HEIGHT);
 	end
+	
+	-- now line
+	love.graphics.line(WINDOW_WIDTH/2, 0, WINDOW_WIDTH/2, WINDOW_HEIGHT);
 
+	-- left and right bounds of screen for each parallax layer
+	leftbounds = {}; rightbounds = {};
+	for i = 1, #PIANOROLL_ZOOMX do
+		leftbounds[i]  = piano_roll_untrax(0,i);
+		rightbounds[i] = piano_roll_untrax(WINDOW_WIDTH,i);
+	end
+	
+	notesdrawn = 0;
+	
 	for ch = 1, CHANNELCOUNT do
 		if ACTIVE_CHANNELS[ch] then
 			for i = 1, #CHANNELS[ch] do
@@ -215,10 +262,25 @@ function love.draw()
 			end
 		end
 	end
+	
+	love.graphics.print("Notes drawn: " .. notesdrawn)
 end
 
 function drawNote(chnum, notenum)
 	local currnote = CHANNELS[chnum][notenum];
+	local layer = PARALLAX_LAYERS[chnum]
+	
+	if currnote.starttick > rightbounds[layer] or currnote.endtick < leftbounds[layer] then
+		return
+	end
+	
+	if CHANNEL_COLORS[chnum] then
+		love.graphics.setColor(CHANNEL_COLORS[chnum])
+	else
+		love.graphics.setColor(COLORS.WHITE)
+	end
+
+	
 	local notelength = currnote.endtick - currnote.starttick;
 	-- base pitch before any bends
 	local pitch = (12 * (currnote.octave + OCTAVE_DIFFS[chnum])) + currnote.pitchclass;
@@ -229,31 +291,39 @@ function drawNote(chnum, notenum)
 			local cb = currnote.bends[i];
 			
 			-- first, the rectangle that comes before the bend
-			local rectwidth = (cb[2] - cx) * PIANOROLL_ZOOMX;
-			local recty = pianoroll_tray(pitch);
-			love.graphics.rectangle("fill", pianoroll_trax(cx), recty, rectwidth, PIANOROLL_ZOOMY);
+			local rectwidth = (cb[2] - cx) * PIANOROLL_ZOOMX[layer];
+			local recty = pianoroll_tray(pitch, layer);
+			love.graphics.rectangle("fill", pianoroll_trax(cx, layer), recty, rectwidth, PIANOROLL_ZOOMY[layer]);
 			
 			pitch = pitch + cb[1];
 			cx = cb[2]
 			
 			-- after the last bend, we draw one more rect to the end of the note
 			if i == #currnote.bends then
-				local rectwidth = (currnote.endtick - cx) * PIANOROLL_ZOOMX;
-				local recty = pianoroll_tray(pitch);
-				love.graphics.rectangle("fill", pianoroll_trax(cx), recty, rectwidth, PIANOROLL_ZOOMY);
+				local rectwidth = (currnote.endtick - cx) * PIANOROLL_ZOOMX[layer];
+				local recty = pianoroll_tray(pitch, layer);
+				love.graphics.rectangle("fill", pianoroll_trax(cx, layer), recty, rectwidth, PIANOROLL_ZOOMY[layer]);
 			end
 		end
 		
 		return
 	end
-	local rectx = pianoroll_trax(currnote.starttick);
-	local recty = pianoroll_tray(pitch);
-	love.graphics.rectangle("fill", rectx, recty, notelength * PIANOROLL_ZOOMX, PIANOROLL_ZOOMY);
+	local rectx = pianoroll_trax(currnote.starttick, layer);
+	local recty = pianoroll_tray(pitch, layer);
+	love.graphics.rectangle("fill", rectx, recty, notelength * PIANOROLL_ZOOMX[layer], PIANOROLL_ZOOMY[layer]);
+	
+	notesdrawn = notesdrawn + 1;
 end
 
-function pianoroll_trax(x)
-	return PIANOROLL_ZOOMX * (x - PIANOROLL_SCROLLX) + (WINDOW_WIDTH / 2); 
+function pianoroll_trax(x, lyr)
+	return PIANOROLL_ZOOMX[lyr] * (x - PIANOROLL_SCROLLX) + (WINDOW_WIDTH / 2); 
 end
-function pianoroll_tray(y)
-	return PIANOROLL_ZOOMY * (60 - y - PIANOROLL_SCROLLY ) + (WINDOW_HEIGHT / 2); 
+function pianoroll_tray(y, lyr)
+	return PIANOROLL_ZOOMY[lyr] * (60 - y - PIANOROLL_SCROLLY ) + (WINDOW_HEIGHT / 2); 
+end
+function piano_roll_untrax(x, lyr)
+	return ((x - (WINDOW_WIDTH / 2) ) / PIANOROLL_ZOOMX[lyr]) + PIANOROLL_SCROLLX;
+end
+function piano_roll_untray(y, lyr)
+	return -((( y - ( WINDOW_HEIGHT / 2 ) ) / PIANOROLL_ZOOMY[lyr] ) + PIANOROLL_SCROLLY) + 60
 end
