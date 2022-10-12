@@ -1,6 +1,7 @@
 -- song specific properties
 CHANNELCOUNT = 28;
 TICKS_PER_ROW = 3;
+ROWS_PER_BEAT = 32;
 SEMITONE_VALUES = {
 	["C-"] = 0, ["C#"] = 1, ["D-"] = 2, ["D#"] = 3,
 	["E-"] = 4, ["F-"] = 5, ["F#"] = 6, ["G-"] = 7,
@@ -12,6 +13,7 @@ ACTIVE_CHANNELS = {
 	false, false, true,  true,  true,  true,  true,
 	false, false, false, false, false, false, false
 }
+BEATS_PER_MINUTE = 140;
 
 OCTAVE_DIFFS = {
 	0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -23,8 +25,8 @@ OCTAVE_DIFFS = {
 BEND_SEGMENTS = 1;
 SEGMENT_WIDTH = 2;
 
-PIANOROLL_ZOOMX = {3, 2.5};
-PIANOROLL_ZOOMY = {16, 12};
+PIANOROLL_ZOOMX = {3, 3};
+PIANOROLL_ZOOMY = {16, 16};
 PIANOROLL_SCROLLX = 0;
 PIANOROLL_SCROLLY = 0;
 
@@ -35,26 +37,36 @@ PARALLAX_LAYERS = {
 	1, 1, 1, 1, 1, 1, 1
 }
 COLORS = {
-	WHITE		= {1,	1,	1},
-	PURPLE		= {0,	0,	0.5},
-	LAVENDER	= {0.5,	0,	0.5},
-	RED			= {1, 0, 0},
-	YELLOW		= {1, 1, 0},
-	GREEN		= {0, 1, 0},
-	BLUE		= {0, 1, 1}
+	NONE		= {1,	1,	1},
+	-- continuo
+	CONT_BASS	= {0,	0,	0.6},
+	CONT_CHORD	= {0.6,	0,	0.6},
+	-- voices
+	VOC_SOP		= {1, 0.5, 0.5},
+	VOC_ALT		= {1, 1, 0},
+	VOC_TEN		= {0, 1, 0},
+	VOC_BAS		= {0, 1, 1}
 }
 CHANNEL_COLORS = {
-	COLORS.WHITE, COLORS.PURPLE, COLORS.LAVENDER, COLORS.LAVENDER, COLORS.LAVENDER, COLORS.LAVENDER, COLORS.LAVENDER,
-	COLORS.LAVENDER, COLORS.LAVENDER, COLORS.LAVENDER, COLORS.LAVENDER, COLORS.LAVENDER, COLORS.LAVENDER, COLORS.LAVENDER,
-	COLORS.LAVENDER, COLORS.LAVENDER, COLORS.RED, COLORS.YELLOW, COLORS.GREEN, COLORS.BLUE
+	COLORS.NONE, COLORS.CONT_BASS, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD,
+	COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD,
+	COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.VOC_SOP, COLORS.VOC_ALT, COLORS.VOC_TEN, COLORS.VOC_BAS
 }
 
 -- playback properties
 playing = false
+currentframetick = 0;
+currentsongtick  = 0;
+dtt = 0;
+
+local moonshine = require 'moonshine'
 
 function love.load()
 	love.window.setTitle("Music Visualizer");
-	success = love.window.setMode( 800, 800, {resizable=true, minwidth=800, minheight=600} )
+	success = love.window.setMode( 1500, 800, {resizable=true, minwidth=800, minheight=600} )
+	
+	chain = moonshine.chain(moonshine.effects.glow)
+	chain.glow.min_luma = 0.5;
 	
 	local inlines = {};
 	for line in io.lines("data/rrr.txt") do
@@ -215,12 +227,43 @@ function love.keypressed(key, scancode, isrepeat)
 	if key == "space" then
 		playing = not playing;
 	end
+	if key == "d" then
+		for i = 1, 48 do
+			frametick();
+		end
+	end
+	if key == "f" then
+		frametick();
+	end
 end
 
-function love.update()
+function love.resize( width, height )
+	print(("Window resized to width: %d and height: %d."):format(width, height))
+	chain = chain.resize(width, height)
+end
+
+function love.update(dt)
 	if playing then
-		PIANOROLL_SCROLLX = PIANOROLL_SCROLLX + 1.866666;
+		frametick();
 	end
+	dtt = dt;
+end
+
+function frametick()
+	currentframetick = currentframetick + 1;
+	-- 140 beats per minute:
+	-- the ratio is 3 and 44/60 song ticks per 60hz frame
+	-- so 44 of the 60 will be four ticks, and the others three ticks
+	if ( currentframetick % 60 > 43 ) then
+		songtick(); songtick(); songtick();
+	else
+		songtick(); songtick(); songtick(); songtick();
+	end
+end
+
+function songtick()
+	PIANOROLL_SCROLLX = PIANOROLL_SCROLLX + 1;
+	currentsongtick = currentsongtick + 1;
 end
 
 function love.mousemoved( x, y, dx, dy, istouch )
@@ -235,9 +278,13 @@ function love.draw()
 	WINDOW_WIDTH  = love.graphics.getWidth();
 	WINDOW_HEIGHT = love.graphics.getHeight();
 
+	love.graphics.print("Current FPS: "..tostring(love.timer.getFPS( )), 10, 15)
+	love.graphics.print("frametick: " .. currentframetick, 10, 30);
+	love.graphics.print("songtick: " .. currentsongtick, 10, 45);
+
 	love.graphics.setColor(1,1,1)
 	-- beat marks
-	local pixelsperbeat = ((TICKS_PER_ROW * 32) * 2)
+	local pixelsperbeat = 32 * PIANOROLL_ZOOMX[1] * 3
 	for i = -16, 16 do
 		local linex = i * pixelsperbeat - ((PIANOROLL_SCROLLX * PIANOROLL_ZOOMX[1]) % pixelsperbeat) + WINDOW_WIDTH/2;
 		love.graphics.line(linex, 0, linex, WINDOW_HEIGHT);
@@ -277,7 +324,7 @@ function drawNote(chnum, notenum)
 	if CHANNEL_COLORS[chnum] then
 		love.graphics.setColor(CHANNEL_COLORS[chnum])
 	else
-		love.graphics.setColor(COLORS.WHITE)
+		love.graphics.setColor(COLORS.NONE)
 	end
 
 	
@@ -290,29 +337,32 @@ function drawNote(chnum, notenum)
 		for i = 1, #currnote.bends do
 			local cb = currnote.bends[i];
 			
-			-- first, the rectangle that comes before the bend
-			local rectwidth = (cb[2] - cx) * PIANOROLL_ZOOMX[layer];
-			local recty = pianoroll_tray(pitch, layer);
-			love.graphics.rectangle("fill", pianoroll_trax(cx, layer), recty, rectwidth, PIANOROLL_ZOOMY[layer]);
+			-- first, the rectangle that comes before the bend			
+			drawTraRect(cx, pitch, cb[2] - cx, 1, layer);
 			
 			pitch = pitch + cb[1];
 			cx = cb[2]
 			
 			-- after the last bend, we draw one more rect to the end of the note
 			if i == #currnote.bends then
-				local rectwidth = (currnote.endtick - cx) * PIANOROLL_ZOOMX[layer];
-				local recty = pianoroll_tray(pitch, layer);
-				love.graphics.rectangle("fill", pianoroll_trax(cx, layer), recty, rectwidth, PIANOROLL_ZOOMY[layer]);
+				drawTraRect(cx, pitch, currnote.endtick - cx, 1, layer);
 			end
 		end
 		
 		return
 	end
-	local rectx = pianoroll_trax(currnote.starttick, layer);
-	local recty = pianoroll_tray(pitch, layer);
-	love.graphics.rectangle("fill", rectx, recty, notelength * PIANOROLL_ZOOMX[layer], PIANOROLL_ZOOMY[layer]);
+	drawTraRect(currnote.starttick, pitch, notelength, 1, layer);
 	
 	notesdrawn = notesdrawn + 1;
+end
+
+-- draw transformed rectangle
+function drawTraRect(x,y,w,h,layer)
+	local rectx = pianoroll_trax(x, layer);   local recty = pianoroll_tray(y, layer);
+	local rectw = w * PIANOROLL_ZOOMX[layer]; local recth = h * PIANOROLL_ZOOMY[layer];
+	--chain.draw(function()
+		love.graphics.rectangle("fill", rectx, recty, rectw, recth);
+	--end)
 end
 
 function pianoroll_trax(x, lyr)
