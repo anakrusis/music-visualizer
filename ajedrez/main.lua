@@ -22,19 +22,19 @@ OCTAVE_DIFFS = {
 
 -- visual properties
 -- how many intermediate rectangles to draw between the notes in a bend
-BEND_SEGMENTS = 1;
-SEGMENT_WIDTH = 2;
+BEND_SEGMENTS = 8;
+SEGMENT_WIDTH = 1;
 
-PIANOROLL_ZOOMX = {3, 2.5};
-PIANOROLL_ZOOMY = {16, 12};
+PIANOROLL_ZOOMX = {2, 2.5, 3, 3.5, 4};
+PIANOROLL_ZOOMY = {10, 12, 16, 18, 20};
 PIANOROLL_SCROLLX = 0;
 PIANOROLL_SCROLLY = 0;
 
 PARALLAX_LAYERS = {
 	1, 2, 2, 2, 2, 2, 2,
 	2, 2, 2, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1
+	1, 1, 3, 5, 4, 3, 5,
+	3, 3, 3, 3, 3, 3, 3
 }
 COLORS = {
 	NONE		= {1,	1,	1},
@@ -50,7 +50,7 @@ COLORS = {
 CHANNEL_COLORS = {
 	COLORS.NONE, COLORS.CONT_BASS, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD,
 	COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD,
-	COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.VOC_SOP, COLORS.VOC_ALT, COLORS.VOC_TEN, COLORS.VOC_BAS
+	COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.VOC_SOP, COLORS.VOC_ALT, COLORS.VOC_TEN, COLORS.VOC_BAS, COLORS.VOC_ALT
 }
 
 -- playback properties
@@ -190,7 +190,9 @@ function parseLine(patternpos, patternsize, rowpos, rowdata)
 						-- absurdly large default value which will be inevitably trimmed
 						-- this, I guess, is better than leaving it nil and having to check for nil
 						endtick  = 100000000,
-						bends = {}
+						bends = {},
+						-- this will turn true on note onset during playback
+						glow = false
 					};
 					currentnote[channelnum] = NewNote;
 					table.insert(CHANNELS[channelnum], NewNote);
@@ -257,7 +259,6 @@ function love.update(dt)
 	if s then
 		currentsongtick = s;
 		PIANOROLL_SCROLLX = currentsongtick;
-		print(currentsongtick);
 	end
 	
 	
@@ -305,9 +306,9 @@ function love.draw()
 
 	love.graphics.setColor(1,1,1)
 	-- every other beat is marked (32 ticks is two beats long)
-	local pixelsperbeat = 32 * PIANOROLL_ZOOMX[1] * 3
+	local pixelsperbeat = 32 * PIANOROLL_ZOOMX[2] * 3
 	for i = -16, 16 do
-		local linex = i * pixelsperbeat - ((PIANOROLL_SCROLLX * PIANOROLL_ZOOMX[1]) % pixelsperbeat) + WINDOW_WIDTH/2;
+		local linex = i * pixelsperbeat - ((PIANOROLL_SCROLLX * PIANOROLL_ZOOMX[2]) % pixelsperbeat) + WINDOW_WIDTH/2;
 		love.graphics.line(linex, 0, linex, WINDOW_HEIGHT);
 	end
 	
@@ -323,10 +324,13 @@ function love.draw()
 	
 	notesdrawn = 0;
 	
-	for ch = 1, CHANNELCOUNT do
-		if ACTIVE_CHANNELS[ch] then
-			for i = 1, #CHANNELS[ch] do
-				drawNote(ch, i);
+	-- channels must be drawn in order from back to front
+	for pl = 1, #PIANOROLL_ZOOMX do
+		for ch = 1, CHANNELCOUNT do
+			if ACTIVE_CHANNELS[ch] and PARALLAX_LAYERS[ch] == pl then
+				for i = 1, #CHANNELS[ch] do
+					drawNote(ch, i);
+				end
 			end
 		end
 	end
@@ -358,11 +362,22 @@ function drawNote(chnum, notenum)
 		for i = 1, #currnote.bends do
 			local cb = currnote.bends[i];
 			
+			initialnoteend = cb[2] - ((1/2) * BEND_SEGMENTS * SEGMENT_WIDTH );
 			-- first, the rectangle that comes before the bend			
-			drawTraRect(cx, pitch, cb[2] - cx, 1, layer);
+			drawTraRect(cx, pitch, initialnoteend - cx, 1, layer);
 			
-			pitch = pitch + cb[1];
-			cx = cb[2]
+			cx = initialnoteend;
+			-- now a set of rectangles acting as segments of the ebnd
+			for q = 1, BEND_SEGMENTS do
+				-- linear slide for now
+				pitch = pitch + (cb[1] / (BEND_SEGMENTS + 1));
+				drawTraRect(cx, pitch, SEGMENT_WIDTH, 1, layer);
+				cx = cx + SEGMENT_WIDTH;
+			end
+			pitch = pitch + (cb[1] / (BEND_SEGMENTS + 1));
+			
+			--pitch = pitch + cb[1];
+			--cx = cb[2]
 			
 			-- after the last bend, we draw one more rect to the end of the note
 			if i == #currnote.bends then
@@ -390,11 +405,11 @@ function pianoroll_trax(x, lyr)
 	return PIANOROLL_ZOOMX[lyr] * (x - PIANOROLL_SCROLLX) + (WINDOW_WIDTH / 2); 
 end
 function pianoroll_tray(y, lyr)
-	return PIANOROLL_ZOOMY[lyr] * (60 - y - PIANOROLL_SCROLLY ) + (WINDOW_HEIGHT / 2); 
+	return PIANOROLL_ZOOMY[lyr] * (50 - y - PIANOROLL_SCROLLY ) + (WINDOW_HEIGHT / 2); 
 end
 function piano_roll_untrax(x, lyr)
 	return ((x - (WINDOW_WIDTH / 2) ) / PIANOROLL_ZOOMX[lyr]) + PIANOROLL_SCROLLX;
 end
 function piano_roll_untray(y, lyr)
-	return -((( y - ( WINDOW_HEIGHT / 2 ) ) / PIANOROLL_ZOOMY[lyr] ) + PIANOROLL_SCROLLY) + 60
+	return -((( y - ( WINDOW_HEIGHT / 2 ) ) / PIANOROLL_ZOOMY[lyr] ) + PIANOROLL_SCROLLY) + 50
 end
