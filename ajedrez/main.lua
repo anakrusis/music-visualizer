@@ -1,7 +1,7 @@
 -- song specific properties
 CHANNELCOUNT = 28;
 TICKS_PER_ROW = 3;
-ROWS_PER_BEAT = 32;
+ROWS_PER_BEAT = 16;
 SEMITONE_VALUES = {
 	["C-"] = 0, ["C#"] = 1, ["D-"] = 2, ["D#"] = 3,
 	["E-"] = 4, ["F-"] = 5, ["F#"] = 6, ["G-"] = 7,
@@ -25,8 +25,8 @@ OCTAVE_DIFFS = {
 BEND_SEGMENTS = 1;
 SEGMENT_WIDTH = 2;
 
-PIANOROLL_ZOOMX = {3, 3};
-PIANOROLL_ZOOMY = {16, 16};
+PIANOROLL_ZOOMX = {3, 2.5};
+PIANOROLL_ZOOMY = {16, 12};
 PIANOROLL_SCROLLX = 0;
 PIANOROLL_SCROLLY = 0;
 
@@ -67,6 +67,10 @@ function love.load()
 	
 	chain = moonshine.chain(moonshine.effects.glow)
 	chain.glow.min_luma = 0.5;
+	
+	timerthread = love.thread.newThread( "timerthread.lua" )
+	
+	audiosource = love.audio.newSource( "song.wav", "stream" )
 	
 	local inlines = {};
 	for line in io.lines("data/rrr.txt") do
@@ -226,14 +230,14 @@ end
 function love.keypressed(key, scancode, isrepeat)
 	if key == "space" then
 		playing = not playing;
+		timerthread:start()
+		audiosource:play();
+		
 	end
 	if key == "d" then
-		for i = 1, 48 do
-			frametick();
-		end
+		love.thread.getChannel( 'endtimer' ):push( true )
 	end
 	if key == "f" then
-		frametick();
 	end
 end
 
@@ -243,8 +247,21 @@ function love.resize( width, height )
 end
 
 function love.update(dt)
+	local stchan = love.thread.getChannel( 'songtick' );
+	local s;
+	
+	for i = 1, stchan:getCount() do 
+		s = stchan:pop();
+	end
+	
+	if s then
+		currentsongtick = s;
+		PIANOROLL_SCROLLX = currentsongtick;
+		print(currentsongtick);
+	end
+	
+	
 	if playing then
-		frametick();
 	end
 	dtt = dt;
 end
@@ -262,8 +279,8 @@ function frametick()
 end
 
 function songtick()
-	PIANOROLL_SCROLLX = PIANOROLL_SCROLLX + 1;
-	currentsongtick = currentsongtick + 1;
+	--PIANOROLL_SCROLLX = PIANOROLL_SCROLLX + 1;
+	--currentsongtick = currentsongtick + 1;
 end
 
 function love.mousemoved( x, y, dx, dy, istouch )
@@ -272,6 +289,10 @@ function love.mousemoved( x, y, dx, dy, istouch )
 		PIANOROLL_SCROLLX = PIANOROLL_SCROLLX - (dx / PIANOROLL_ZOOMX[1]);
 		PIANOROLL_SCROLLY = PIANOROLL_SCROLLY - (dy / PIANOROLL_ZOOMY[1]);
 	end
+end
+
+function love.quit()
+	
 end
 
 function love.draw()
@@ -283,7 +304,7 @@ function love.draw()
 	love.graphics.print("songtick: " .. currentsongtick, 10, 45);
 
 	love.graphics.setColor(1,1,1)
-	-- beat marks
+	-- every other beat is marked (32 ticks is two beats long)
 	local pixelsperbeat = 32 * PIANOROLL_ZOOMX[1] * 3
 	for i = -16, 16 do
 		local linex = i * pixelsperbeat - ((PIANOROLL_SCROLLX * PIANOROLL_ZOOMX[1]) % pixelsperbeat) + WINDOW_WIDTH/2;
