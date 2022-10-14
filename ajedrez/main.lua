@@ -8,8 +8,8 @@ SEMITONE_VALUES = {
 	["G#"] = 8, ["A-"] = 9, ["A#"] = 10,["B-"] = 11,
 }
 ACTIVE_CHANNELS = { 
-	false, true,  true,  true,  true,  true,  false, 
-	false,  false,  false,  false, false, false, false, -- starting fourth in this row are drums
+	false, true,  true,  true,  true,  true,  true, 
+	true,  true,  true,  false, false, false, false, -- starting fourth in this row are drums
 	false, false, true,  true,  true,  true,  true,
 	false, false, false, false, false, false, false
 }
@@ -22,18 +22,18 @@ OCTAVE_DIFFS = {
 
 -- visual properties
 -- how many intermediate rectangles to draw between the notes in a bend
-BEND_SEGMENTS = 8;
+BEND_SEGMENTS = 6;
 SEGMENT_WIDTH = 1;
 
 PIANOROLL_ZOOMX = {2, 2.5, 3, 3.5, 4};
-PIANOROLL_ZOOMY = {10, 12, 16, 18, 20};
+PIANOROLL_ZOOMY = {11, 12, 16, 18, 20};
 PIANOROLL_SCROLLX = 0;
 PIANOROLL_SCROLLY = 0;
 
 PARALLAX_LAYERS = {
 	1, 2, 2, 2, 2, 2, 2,
-	2, 2, 2, 1, 1, 1, 1,
-	1, 1, 3, 5, 4, 3, 5,
+	2, 1, 1, 1, 1, 1, 1,
+	1, 1, 3, 5, 4, 3, 4,
 	3, 3, 3, 3, 3, 3, 3
 }
 COLORS = {
@@ -41,16 +41,18 @@ COLORS = {
 	-- continuo
 	CONT_BASS	= {0,	0,	0.6},
 	CONT_CHORD	= {0.6,	0,	0.6},
+	CONT_STAB	= {0.7,	0.3,0.8},
 	-- voices
-	VOC_SOP		= {1, 0.5, 0.5},
+	VOC_SOP		= {1, 0.3, 0.3},
 	VOC_ALT		= {1, 1, 0},
 	VOC_TEN		= {0, 1, 0},
-	VOC_BAS		= {0, 1, 1}
+	VOC_BAS		= {0, 1, 1},
+	VOC_OTHER	= {1, 0.75, 0.5}
 }
 CHANNEL_COLORS = {
 	COLORS.NONE, COLORS.CONT_BASS, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD,
-	COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD,
-	COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.VOC_SOP, COLORS.VOC_ALT, COLORS.VOC_TEN, COLORS.VOC_BAS, COLORS.VOC_ALT
+	COLORS.CONT_CHORD, COLORS.CONT_STAB, COLORS.CONT_STAB, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD,
+	COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.VOC_SOP, COLORS.VOC_ALT, COLORS.VOC_TEN, COLORS.VOC_BAS, COLORS.VOC_OTHER
 }
 
 -- playback properties
@@ -71,6 +73,8 @@ function love.load()
 	timerthread = love.thread.newThread( "timerthread.lua" )
 	
 	audiosource = love.audio.newSource( "song.wav", "stream" )
+	
+	IMG_GLOW	= love.graphics.newImage("glow2.png");
 	
 	local inlines = {};
 	for line in io.lines("data/rrr.txt") do
@@ -192,7 +196,7 @@ function parseLine(patternpos, patternsize, rowpos, rowdata)
 						endtick  = 100000000,
 						bends = {},
 						-- this will turn true on note onset during playback
-						glow = false
+						glow = true
 					};
 					currentnote[channelnum] = NewNote;
 					table.insert(CHANNELS[channelnum], NewNote);
@@ -340,7 +344,8 @@ end
 
 function drawNote(chnum, notenum)
 	local currnote = CHANNELS[chnum][notenum];
-	local layer = PARALLAX_LAYERS[chnum]
+	local layer = PARALLAX_LAYERS[chnum];
+	local gl = currnote.glow;
 	
 	if currnote.starttick > rightbounds[layer] or currnote.endtick < leftbounds[layer] then
 		return
@@ -364,7 +369,7 @@ function drawNote(chnum, notenum)
 			
 			initialnoteend = cb[2] - ((1/2) * BEND_SEGMENTS * SEGMENT_WIDTH );
 			-- first, the rectangle that comes before the bend			
-			drawTraRect(cx, pitch, initialnoteend - cx, 1, layer);
+			drawTraRect(cx, pitch, initialnoteend - cx, 1, layer, gl);
 			
 			cx = initialnoteend;
 			-- now a set of rectangles acting as segments of the ebnd
@@ -381,21 +386,32 @@ function drawNote(chnum, notenum)
 			
 			-- after the last bend, we draw one more rect to the end of the note
 			if i == #currnote.bends then
-				drawTraRect(cx, pitch, currnote.endtick - cx, 1, layer);
+				drawTraRect(cx, pitch, (currnote.endtick - 1) - cx, 1, layer, gl);
 			end
 		end
 		
 		return
 	end
-	drawTraRect(currnote.starttick, pitch, notelength, 1, layer);
+	-- non bending notes just get the regular single rectangle
+	drawTraRect(currnote.starttick, pitch, notelength-1, 1, layer, gl);
 	
 	notesdrawn = notesdrawn + 1;
 end
 
 -- draw transformed rectangle
-function drawTraRect(x,y,w,h,layer)
+function drawTraRect(x,y,w,h,layer,glow)
 	local rectx = pianoroll_trax(x, layer);   local recty = pianoroll_tray(y, layer);
 	local rectw = w * PIANOROLL_ZOOMX[layer]; local recth = h * PIANOROLL_ZOOMY[layer];
+	
+	if glow then
+		--local glowradius = 2;
+		local glowx = rectx - (1/2) * rectw; 
+		local glowy = recty - (4/2) * recth;
+		local gloww = (rectw + rectw) / IMG_GLOW:getWidth();
+		local glowh = (recth + (recth*4)) / IMG_GLOW:getHeight();
+		love.graphics.draw(IMG_GLOW, glowx, glowy, 0, gloww, glowh);
+	end
+	
 	--chain.draw(function()
 		love.graphics.rectangle("fill", rectx, recty, rectw, recth);
 	--end)
