@@ -22,8 +22,8 @@ OCTAVE_DIFFS = {
 
 -- visual properties
 -- how many intermediate rectangles to draw between the notes in a bend
-BEND_SEGMENTS = 6;
-SEGMENT_WIDTH = 1;
+BEND_SEGMENTS = 16;
+SEGMENT_WIDTH = 0.25;
 
 PIANOROLL_ZOOMX = {2, 2.5, 3, 3.5, 4};
 PIANOROLL_ZOOMY = {11, 12, 16, 18, 20};
@@ -116,7 +116,7 @@ function love.load()
 		currentnote[j] = {};
 	end
 	
-	for i = 1, 96 do
+	for i = 1, 102 do
 		--print("parsing pattern " .. PATTERN_ORDER[i]);
 		-- this first line only indicates the number of rows to the pattern
 		-- TODO: I assumed that every line is 64 rows long, which in reality can vary freely
@@ -196,7 +196,7 @@ function parseLine(patternpos, patternsize, rowpos, rowdata)
 						endtick  = 100000000,
 						bends = {},
 						-- this will turn true on note onset during playback
-						glow = true
+						glow = false
 					};
 					currentnote[channelnum] = NewNote;
 					table.insert(CHANNELS[channelnum], NewNote);
@@ -350,43 +350,68 @@ function drawNote(chnum, notenum)
 	if currnote.starttick > rightbounds[layer] or currnote.endtick < leftbounds[layer] then
 		return
 	end
-	
-	if CHANNEL_COLORS[chnum] then
-		love.graphics.setColor(CHANNEL_COLORS[chnum])
-	else
-		love.graphics.setColor(COLORS.NONE)
+	if currnote.starttick < currentsongtick then
+		gl = true;
 	end
-
+	
+	local lightcolor = {}; local darkcolor = {};
+	if CHANNEL_COLORS[chnum] then
+		lightcolor = CHANNEL_COLORS[chnum];
+	else
+		lightcolor = COLORS.NONE;
+	end
+	-- must deep copy table to darken the color
+	darkcolor[1] = 0.5 * lightcolor[1];
+	darkcolor[2] = 0.5 * lightcolor[2];
+	darkcolor[3] = 0.5 * lightcolor[3];
+	
+	if not gl then
+		love.graphics.setColor(darkcolor)
+	else
+		love.graphics.setColor(lightcolor)
+	end
+	
 	
 	local notelength = currnote.endtick - currnote.starttick;
 	-- base pitch before any bends
-	local pitch = (12 * (currnote.octave + OCTAVE_DIFFS[chnum])) + currnote.pitchclass;
+	local basepitch = (12 * (currnote.octave + OCTAVE_DIFFS[chnum])) + currnote.pitchclass;
 	local cx = currnote.starttick
+	
+	local pitch = basepitch;
 	
 	if #currnote.bends > 0 then
 		for i = 1, #currnote.bends do
 			local cb = currnote.bends[i];
 			
 			initialnoteend = cb[2] - ((1/2) * BEND_SEGMENTS * SEGMENT_WIDTH );
-			-- first, the rectangle that comes before the bend			
-			drawTraRect(cx, pitch, initialnoteend - cx, 1, layer, gl);
+			-- first, the rectangle that comes before the bend
+			if (cx < currentsongtick) then love.graphics.setColor(lightcolor) else love.graphics.setColor(darkcolor) end
+			drawTraRect(cx, pitch, initialnoteend - cx, 1, layer, cx < currentsongtick);
 			
 			cx = initialnoteend;
 			-- now a set of rectangles acting as segments of the ebnd
 			for q = 1, BEND_SEGMENTS do
-				-- linear slide for now
-				pitch = pitch + (cb[1] / (BEND_SEGMENTS + 1));
+				-- old linear slide
+				--pitch = pitch + (cb[1] / (BEND_SEGMENTS + 1));
+				
+				-- new cosine based interpolation
+				local ycoeff = -(1/2) * cb[1]
+				local offset = (1/2) * cb[1]
+				pitch = basepitch + (ycoeff * math.cos( math.pi * ( 1 / BEND_SEGMENTS ) * q )) + offset;
+				
 				drawTraRect(cx, pitch, SEGMENT_WIDTH, 1, layer);
 				cx = cx + SEGMENT_WIDTH;
 			end
-			pitch = pitch + (cb[1] / (BEND_SEGMENTS + 1));
+			--pitch = pitch + (cb[1] / (BEND_SEGMENTS + 1));
 			
-			--pitch = pitch + cb[1];
+			pitch = basepitch + cb[1];
+			basepitch = pitch;
 			--cx = cb[2]
 			
 			-- after the last bend, we draw one more rect to the end of the note
 			if i == #currnote.bends then
-				drawTraRect(cx, pitch, (currnote.endtick - 1) - cx, 1, layer, gl);
+				if (cx < currentsongtick) then love.graphics.setColor(lightcolor) else love.graphics.setColor(darkcolor) end
+				drawTraRect(cx, pitch, (currnote.endtick - 1) - cx, 1, layer, cx < currentsongtick);
 			end
 		end
 		
@@ -410,6 +435,7 @@ function drawTraRect(x,y,w,h,layer,glow)
 		local gloww = (rectw + rectw) / IMG_GLOW:getWidth();
 		local glowh = (recth + (recth*4)) / IMG_GLOW:getHeight();
 		love.graphics.draw(IMG_GLOW, glowx, glowy, 0, gloww, glowh);
+	else
 	end
 	
 	--chain.draw(function()
