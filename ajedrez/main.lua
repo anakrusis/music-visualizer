@@ -39,20 +39,78 @@ PARALLAX_LAYERS = {
 COLORS = {
 	NONE		= {1,	1,	1},
 	-- continuo
-	CONT_BASS	= {0,	0,	0.6},
-	CONT_CHORD	= {0.6,	0,	0.6},
-	CONT_STAB	= {0.7,	0.3,0.8},
+	CONT_BASS	= {0.2,	0.2,	0.2},
+	CONT_CHORD	= {0.4,	0.4,	0.4},
+	CONT_STAB	= {0.7,	0.7,0.7},
 	-- voices
-	VOC_SOP		= {1, 0.3, 0.3},
-	VOC_ALT		= {1, 1, 0},
-	VOC_TEN		= {0, 1, 0},
-	VOC_BAS		= {0, 1, 1},
+	THEME1		= {1, 0.3, 0.3},
+	THEME2		= {1, 1, 0},
+	THEME3		= {0, 1, 0},
+	THEME4		= {0, 1, 1},
+	
+	MOTIF1		= {0.45, 0.10, 1},
+	M1FRAG		= {0.66, 0.50, 1},
+	-- octave blips
+	MOTIF2		= {0.33, 0.5, 1},
+	
+	MOTIF3		= {1, 0.5, 0.2},
+	
+	MOTIF4		= {1,0,1},
+	M4FRAG		= {1,0.5,1},
+	
+	MOTIF5		= {0.66, 0.85, 0},
+	
 	VOC_OTHER	= {1, 0.75, 0.5}
 }
+-- initial default colors for the channels
 CHANNEL_COLORS = {
 	COLORS.NONE, COLORS.CONT_BASS, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD,
 	COLORS.CONT_CHORD, COLORS.CONT_STAB, COLORS.CONT_STAB, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD,
-	COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.VOC_SOP, COLORS.VOC_ALT, COLORS.VOC_TEN, COLORS.VOC_BAS, COLORS.VOC_OTHER
+	COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.NONE, COLORS.THEME1, COLORS.NONE, COLORS.MOTIF2, COLORS.VOC_OTHER
+}
+-- each table has sub tables with two items { tick of occurence,  }
+colorchanges = {
+	{},{},{},{},{},{},{},
+	{},{},{},{},{},{},{},
+	{},{},
+	-- voice 1
+	{
+	{1530, COLORS.THEME1}, {2400, COLORS.NONE}, {2609, COLORS.MOTIF2}, {2794, COLORS.NONE},
+	{3072, COLORS.THEME3}, {3842, COLORS.NONE}, {3980, COLORS.MOTIF4}, {4049, COLORS.MOTIF2},
+	{4215, COLORS.MOTIF4}, {4278, COLORS.NONE}, {4720, COLORS.MOTIF2}, {4863, COLORS.NONE},
+	{5377, COLORS.THEME4}, {6199, COLORS.MOTIF1}, {6394, COLORS.M1FRAG}, {6584, COLORS.MOTIF1},
+	{6754, COLORS.MOTIF5},
+	},
+	-- voice 2
+	{
+	{1400, COLORS.THEME2}, {2320, COLORS.MOTIF2}, {2557,COLORS.NONE}, {3089, COLORS.THEME2}, 
+	{3860, COLORS.MOTIF2}, {4000, COLORS.MOTIF4}, {4120, COLORS.NONE}, 
+	{4281, COLORS.MOTIF1}, {4433, COLORS.MOTIF2},
+	{4484, COLORS.NONE}, {4623, COLORS.MOTIF2}, {4863, COLORS.NONE}, {5107, COLORS.MOTIF2},
+	{5239, COLORS.NONE},
+	{5377, COLORS.THEME3}, {6103, COLORS.NONE}, {6389, COLORS.MOTIF1}, {6540, COLORS.M1FRAG}, 
+	{6711, COLORS.NONE}, {6800, COLORS.MOTIF5}, {7092, COLORS.NONE}, {7290, COLORS.MOTIF4},
+	{7411, COLORS.MOTIF3},
+	},
+	-- voice 3
+	{
+	{2971, COLORS.THEME1}, {4032, COLORS.M4FRAG}, {4145, COLORS.NONE}, {4315, COLORS.M4FRAG},
+	{4388, COLORS.NONE},
+	{5381, COLORS.THEME2}, 
+	{6186, COLORS.NONE},
+	{6289, COLORS.M1FRAG}, {6375, COLORS.NONE}, {6443, COLORS.M1FRAG}, {6520, COLORS.NONE},
+	{6680, COLORS.M1FRAG}, {6849, COLORS.MOTIF5}, {7065, COLORS.MOTIF1}, {7241, COLORS.MOTIF4},
+	{7331, COLORS.MOTIF5},
+	{7700, COLORS.THEME2},
+	
+	},
+	-- voice 4
+	{
+	{5296, COLORS.THEME1}, {6180, COLORS.MOTIF3}, {6755, COLORS.NONE}, {7197, COLORS.MOTIF4},
+	{7628, COLORS.THEME1}
+	},
+	-- supplementary voice "5"
+	{}
 }
 
 -- playback properties
@@ -186,7 +244,24 @@ function parseLine(patternpos, patternsize, rowpos, rowdata)
 						currentnote[channelnum] = nil;
 					end
 					
-					--print(pitchclassstring);
+					-- COLOR ASSIGNMENT:
+					-- defaults to the initial color in the CHANNEL_COLORS table (or white if there is none)
+					local notecolor;
+					if CHANNEL_COLORS[channelnum] then
+						notecolor = CHANNEL_COLORS[channelnum];
+					else
+						notecolor = COLORS.NONE;
+					end
+					local changes = colorchanges[channelnum];
+					-- iterates through the color changes to see if any of them apply
+					if changes then
+						for q = 1, #changes do
+							if changes[q][1] < currtick then
+								notecolor = changes[q][2];
+							end
+						end
+					end
+
 					local NewNote = {
 						pitchclass = SEMITONE_VALUES[pitchclassstring],
 						octave = nextchar,
@@ -196,7 +271,8 @@ function parseLine(patternpos, patternsize, rowpos, rowdata)
 						endtick  = 100000000,
 						bends = {},
 						-- this will turn true on note onset during playback
-						glow = false
+						glow = false,
+						color = notecolor
 					};
 					currentnote[channelnum] = NewNote;
 					table.insert(CHANNELS[channelnum], NewNote);
@@ -291,8 +367,8 @@ end
 function love.mousemoved( x, y, dx, dy, istouch )
 	-- middle click and dragging: pans the view
 	if love.mouse.isDown( 3 ) then
-		PIANOROLL_SCROLLX = PIANOROLL_SCROLLX - (dx / PIANOROLL_ZOOMX[1]);
-		PIANOROLL_SCROLLY = PIANOROLL_SCROLLY - (dy / PIANOROLL_ZOOMY[1]);
+		PIANOROLL_SCROLLX = PIANOROLL_SCROLLX - (dx / PIANOROLL_ZOOMX[2]);
+		PIANOROLL_SCROLLY = PIANOROLL_SCROLLY - (dy / PIANOROLL_ZOOMY[2]);
 	end
 end
 
@@ -307,13 +383,14 @@ function love.draw()
 	love.graphics.print("Current FPS: "..tostring(love.timer.getFPS( )), 10, 15)
 	love.graphics.print("frametick: " .. currentframetick, 10, 30);
 	love.graphics.print("songtick: " .. currentsongtick, 10, 45);
+	love.graphics.print("campos: " .. piano_roll_untrax(WINDOW_WIDTH/2, 2),10,60);
 
 	love.graphics.setColor(1,1,1)
 	-- every other beat is marked (32 ticks is two beats long)
 	local pixelsperbeat = 32 * PIANOROLL_ZOOMX[2] * 3
 	for i = -16, 16 do
 		local linex = i * pixelsperbeat - ((PIANOROLL_SCROLLX * PIANOROLL_ZOOMX[2]) % pixelsperbeat) + WINDOW_WIDTH/2;
-		love.graphics.line(linex, 0, linex, WINDOW_HEIGHT);
+		--love.graphics.line(linex, 0, linex, WINDOW_HEIGHT);
 	end
 	
 	-- now line
@@ -354,12 +431,7 @@ function drawNote(chnum, notenum)
 		gl = true;
 	end
 	
-	local lightcolor = {}; local darkcolor = {};
-	if CHANNEL_COLORS[chnum] then
-		lightcolor = CHANNEL_COLORS[chnum];
-	else
-		lightcolor = COLORS.NONE;
-	end
+	local lightcolor = currnote.color; local darkcolor = {};
 	-- must deep copy table to darken the color
 	darkcolor[1] = 0.5 * lightcolor[1];
 	darkcolor[2] = 0.5 * lightcolor[2];
