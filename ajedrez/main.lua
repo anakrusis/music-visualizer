@@ -13,7 +13,10 @@ ACTIVE_CHANNELS = {
 	false, false, true,  true,  true,  true,  true,
 	false, false, false, false, false, false, false
 }
-BEATS_PER_MINUTE = 140;
+BEATS_PER_MINUTE = 140.19;
+rowsperminute 	= BEATS_PER_MINUTE * ROWS_PER_BEAT;
+ticksperminute 	= rowsperminute * TICKS_PER_ROW;
+tickspersecond	= ticksperminute / 60;
 
 OCTAVE_DIFFS = {
 	0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -39,9 +42,9 @@ PARALLAX_LAYERS = {
 COLORS = {
 	NONE		= {1,	1,	1},
 	-- continuo
-	CONT_BASS	= {0.2,	0.2,	0.2},
-	CONT_CHORD	= {0.4,	0.4,	0.4},
-	CONT_STAB	= {0.7,	0.7,0.7},
+	CONT_BASS	= {0,	0,	0.5},
+	CONT_CHORD	= {0.4,	0,	0.4},
+	CONT_STAB	= {0.7,	0.3,0.8},
 	-- voices
 	THEME1		= {1, 0.3, 0.3},
 	THEME2		= {1, 1, 0},
@@ -66,56 +69,61 @@ COLORS = {
 CHANNEL_COLORS = {
 	COLORS.NONE, COLORS.CONT_BASS, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD,
 	COLORS.CONT_CHORD, COLORS.CONT_STAB, COLORS.CONT_STAB, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.CONT_CHORD,
-	COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.NONE, COLORS.THEME1, COLORS.NONE, COLORS.MOTIF2, COLORS.VOC_OTHER
+	COLORS.CONT_CHORD, COLORS.CONT_CHORD, COLORS.THEME1, COLORS.THEME2, COLORS.THEME3, COLORS.THEME4, COLORS.VOC_OTHER
 }
 -- each table has sub tables with two items { tick of occurence,  }
 colorchanges = {
 	{},{},{},{},{},{},{},
 	{},{},{},{},{},{},{},
 	{},{},
-	-- voice 1
-	{
-	{1530, COLORS.THEME1}, {2400, COLORS.NONE}, {2609, COLORS.MOTIF2}, {2794, COLORS.NONE},
-	{3072, COLORS.THEME3}, {3842, COLORS.NONE}, {3980, COLORS.MOTIF4}, {4049, COLORS.MOTIF2},
-	{4215, COLORS.MOTIF4}, {4278, COLORS.NONE}, {4720, COLORS.MOTIF2}, {4863, COLORS.NONE},
-	{5377, COLORS.THEME4}, {6199, COLORS.MOTIF1}, {6394, COLORS.M1FRAG}, {6584, COLORS.MOTIF1},
-	{6754, COLORS.MOTIF5},
-	},
-	-- voice 2
-	{
-	{1400, COLORS.THEME2}, {2320, COLORS.MOTIF2}, {2557,COLORS.NONE}, {3089, COLORS.THEME2}, 
-	{3860, COLORS.MOTIF2}, {4000, COLORS.MOTIF4}, {4120, COLORS.NONE}, 
-	{4281, COLORS.MOTIF1}, {4433, COLORS.MOTIF2},
-	{4484, COLORS.NONE}, {4623, COLORS.MOTIF2}, {4863, COLORS.NONE}, {5107, COLORS.MOTIF2},
-	{5239, COLORS.NONE},
-	{5377, COLORS.THEME3}, {6103, COLORS.NONE}, {6389, COLORS.MOTIF1}, {6540, COLORS.M1FRAG}, 
-	{6711, COLORS.NONE}, {6800, COLORS.MOTIF5}, {7092, COLORS.NONE}, {7290, COLORS.MOTIF4},
-	{7411, COLORS.MOTIF3},
-	},
-	-- voice 3
-	{
-	{2971, COLORS.THEME1}, {4032, COLORS.M4FRAG}, {4145, COLORS.NONE}, {4315, COLORS.M4FRAG},
-	{4388, COLORS.NONE},
-	{5381, COLORS.THEME2}, 
-	{6186, COLORS.NONE},
-	{6289, COLORS.M1FRAG}, {6375, COLORS.NONE}, {6443, COLORS.M1FRAG}, {6520, COLORS.NONE},
-	{6680, COLORS.M1FRAG}, {6849, COLORS.MOTIF5}, {7065, COLORS.MOTIF1}, {7241, COLORS.MOTIF4},
-	{7331, COLORS.MOTIF5},
-	{7700, COLORS.THEME2},
+	-- -- voice 1
+	{},
+	-- {
+	-- {1530, COLORS.THEME1}, {2400, COLORS.NONE}, {2609, COLORS.MOTIF2}, {2794, COLORS.NONE},
+	-- {3072, COLORS.THEME3}, {3842, COLORS.NONE}, {3980, COLORS.MOTIF4}, {4049, COLORS.MOTIF2},
+	-- {4215, COLORS.MOTIF4}, {4278, COLORS.NONE}, {4720, COLORS.MOTIF2}, {4863, COLORS.NONE},
+	-- {5377, COLORS.THEME4}, {6199, COLORS.MOTIF1}, {6394, COLORS.M1FRAG}, {6584, COLORS.MOTIF1},
+	-- {6754, COLORS.MOTIF5},
+	-- },
+	-- -- voice 2
+	{},
+	-- {
+	-- {1400, COLORS.THEME2}, {2320, COLORS.MOTIF2}, {2557,COLORS.NONE}, {3089, COLORS.THEME2}, 
+	-- {3860, COLORS.MOTIF2}, {4000, COLORS.MOTIF4}, {4120, COLORS.NONE}, 
+	-- {4281, COLORS.MOTIF1}, {4433, COLORS.MOTIF2},
+	-- {4484, COLORS.NONE}, {4623, COLORS.MOTIF2}, {4863, COLORS.NONE}, {5107, COLORS.MOTIF2},
+	-- {5239, COLORS.NONE},
+	-- {5377, COLORS.THEME3}, {6103, COLORS.NONE}, {6389, COLORS.MOTIF1}, {6540, COLORS.M1FRAG}, 
+	-- {6711, COLORS.NONE}, {6800, COLORS.MOTIF5}, {7092, COLORS.NONE}, {7290, COLORS.MOTIF4},
+	-- {7411, COLORS.MOTIF3},
+	-- },
+	-- -- voice 3
+	{},
+	-- {
+	-- {2971, COLORS.THEME1}, {4032, COLORS.M4FRAG}, {4145, COLORS.NONE}, {4315, COLORS.M4FRAG},
+	-- {4388, COLORS.NONE},
+	-- {5381, COLORS.THEME2}, 
+	-- {6186, COLORS.NONE},
+	-- {6289, COLORS.M1FRAG}, {6375, COLORS.NONE}, {6443, COLORS.M1FRAG}, {6520, COLORS.NONE},
+	-- {6680, COLORS.M1FRAG}, {6849, COLORS.MOTIF5}, {7065, COLORS.MOTIF1}, {7241, COLORS.MOTIF4},
+	-- {7331, COLORS.MOTIF5},
+	-- {7700, COLORS.THEME2},
 	
-	},
-	-- voice 4
-	{
-	{5296, COLORS.THEME1}, {6180, COLORS.MOTIF3}, {6755, COLORS.NONE}, {7197, COLORS.MOTIF4},
-	{7628, COLORS.THEME1}
-	},
-	-- supplementary voice "5"
-	{}
+	-- },
+	-- -- voice 4
+	{},
+	-- {
+	-- {5296, COLORS.THEME1}, {6180, COLORS.MOTIF3}, {6755, COLORS.NONE}, {7197, COLORS.MOTIF4},
+	-- {7628, COLORS.THEME1}
+	-- },
+	-- -- supplementary voice "5"
+	-- {}
 }
 
 -- playback properties
-playing = false
-currentframetick = 0;
+playing = false;
+rendering = false;
+currentframe = 0;
 currentsongtick  = 0;
 dtt = 0;
 
@@ -130,9 +138,9 @@ function love.load()
 	
 	timerthread = love.thread.newThread( "timerthread.lua" )
 	
-	audiosource = love.audio.newSource( "song.wav", "stream" )
+	audiosource = love.audio.newSource( "assets/song.wav", "stream" )
 	
-	IMG_GLOW	= love.graphics.newImage("glow2.png");
+	IMG_GLOW	= love.graphics.newImage("assets/sqrglow.png");
 	
 	local inlines = {};
 	for line in io.lines("data/rrr.txt") do
@@ -272,10 +280,30 @@ function parseLine(patternpos, patternsize, rowpos, rowdata)
 						bends = {},
 						-- this will turn true on note onset during playback
 						glow = false,
-						color = notecolor
+						color = notecolor,
+						squareshape = true
 					};
 					currentnote[channelnum] = NewNote;
 					table.insert(CHANNELS[channelnum], NewNote);
+				end
+			end
+			
+			-- instrument column starts here, only two digits long
+			if charsincepipe == 4 then
+				local nextchar     = (string.sub(rowdata, i+1, i+1));
+				-- the not square wave instrument will be drawn different in the visualizer
+				-- everything else will get square noteheads
+				if currchar .. nextchar == "11" then
+					if currentnote[channelnum] then
+						currentnote[channelnum].squareshape = false;
+					end
+				end
+				-- theres literally one orch hit... im gonna display it up an octave so the glow fx dont stack oddly
+				if currchar .. nextchar == "33" then
+					if currentnote[channelnum] then
+						currentnote[channelnum].octave = currentnote[channelnum].octave + 1; -- add ++ please lua im beging you
+						currentnote[channelnum].color = COLORS.NONE; currentnote[channelnum].squareshape = false;
+					end
 				end
 			end
 			
@@ -310,16 +338,18 @@ function parseLine(patternpos, patternsize, rowpos, rowdata)
 end
 
 function love.keypressed(key, scancode, isrepeat)
-	if key == "space" then
+	if key == "space" and not rendering then
 		playing = not playing;
 		timerthread:start()
 		audiosource:play();
-		
 	end
+	if key == "r" and not playing then
+		--audiosource:play();
+		rendering = not rendering;
+	end
+	
 	if key == "d" then
 		love.thread.getChannel( 'endtimer' ):push( true )
-	end
-	if key == "f" then
 	end
 end
 
@@ -329,22 +359,39 @@ function love.resize( width, height )
 end
 
 function love.update(dt)
-	local stchan = love.thread.getChannel( 'songtick' );
-	local s;
-	
-	for i = 1, stchan:getCount() do 
-		s = stchan:pop();
-	end
-	
-	if s then
-		currentsongtick = s;
+	-- real time playback
+	-- (cannot go on at the same time as rendering)
+	if not rendering then
+		local stchan = love.thread.getChannel( 'songtick' );
+		local s;
+		for i = 1, stchan:getCount() do 
+			s = stchan:pop();
+		end
+		if s then
+			currentsongtick = s;
+			PIANOROLL_SCROLLX = currentsongtick;
+		end
+		
+	-- rendering
+	else
+		currentsongtick = tickspersecond * ( currentframe / 60 );
 		PIANOROLL_SCROLLX = currentsongtick;
+		
+		love.graphics.captureScreenshot( screenshotFinished )
+		
+		currentframe = currentframe + 1;
 	end
 	
-	
-	if playing then
-	end
 	dtt = dt;
+end
+
+function screenshotFinished(imagedata)
+	dataOut = imagedata:encode("png")
+	str_out = dataOut:getString()
+	
+	file = io.open ("out/" .. currentframe .. ".png", "wb")
+	file:write(str_out)
+	file:close()
 end
 
 function frametick()
@@ -381,7 +428,7 @@ function love.draw()
 	WINDOW_HEIGHT = love.graphics.getHeight();
 
 	love.graphics.print("Current FPS: "..tostring(love.timer.getFPS( )), 10, 15)
-	love.graphics.print("frametick: " .. currentframetick, 10, 30);
+	love.graphics.print("frametick: " .. currentframe, 10, 30);
 	love.graphics.print("songtick: " .. currentsongtick, 10, 45);
 	love.graphics.print("campos: " .. piano_roll_untrax(WINDOW_WIDTH/2, 2),10,60);
 
@@ -458,7 +505,10 @@ function drawNote(chnum, notenum)
 			initialnoteend = cb[2] - ((1/2) * BEND_SEGMENTS * SEGMENT_WIDTH );
 			-- first, the rectangle that comes before the bend
 			if (cx < currentsongtick) then love.graphics.setColor(lightcolor) else love.graphics.setColor(darkcolor) end
-			drawTraRect(cx, pitch, initialnoteend - cx, 1, layer, cx < currentsongtick);
+			local shape;
+			-- the first segment of a bendy note can have a special onset shape
+			if i == 1 and not currnote.squareshape then shape = 3 end
+			drawTraRect(cx, pitch, initialnoteend - cx, 1, layer, cx < currentsongtick, shape);
 			
 			cx = initialnoteend;
 			-- now a set of rectangles acting as segments of the ebnd
@@ -483,36 +533,73 @@ function drawNote(chnum, notenum)
 			-- after the last bend, we draw one more rect to the end of the note
 			if i == #currnote.bends then
 				if (cx < currentsongtick) then love.graphics.setColor(lightcolor) else love.graphics.setColor(darkcolor) end
-				drawTraRect(cx, pitch, (currnote.endtick - 1) - cx, 1, layer, cx < currentsongtick);
+				local shape;
+				if (currnote.squareshape) then shape = 1 else shape = 4 end
+				drawTraRect(cx, pitch, (currnote.endtick - 1) - cx, 1, layer, cx < currentsongtick, shape);
 			end
 		end
 		
 		return
 	end
 	-- non bending notes just get the regular single rectangle
-	drawTraRect(currnote.starttick, pitch, notelength-1, 1, layer, gl);
+	local shape;
+	if (currnote.squareshape) then shape = 1 else shape = 2 end
+	drawTraRect(currnote.starttick, pitch, notelength-1, 1, layer, gl, shape);
 	
 	notesdrawn = notesdrawn + 1;
 end
 
 -- draw transformed rectangle
-function drawTraRect(x,y,w,h,layer,glow)
+function drawTraRect(x,y,w,h,layer,glow,shape)
 	local rectx = pianoroll_trax(x, layer);   local recty = pianoroll_tray(y, layer);
 	local rectw = w * PIANOROLL_ZOOMX[layer]; local recth = h * PIANOROLL_ZOOMY[layer];
+	local rectendx = rectx + rectw; local rectendy = recty + recth;
+	
+	-- glow slowly fades as it moves away from the center of screen
+	local r, g, b, a = love.graphics.getColor();
+	local newalpha = (rectx / (WINDOW_WIDTH/2)) + 0.1
+	love.graphics.setColor(r,g,b,newalpha);
 	
 	if glow then
-		--local glowradius = 2;
-		local glowx = rectx - (1/2) * rectw; 
-		local glowy = recty - (4/2) * recth;
-		local gloww = (rectw + rectw) / IMG_GLOW:getWidth();
-		local glowh = (recth + (recth*4)) / IMG_GLOW:getHeight();
+		local glowradiusx = 100;
+		local glowradiusy = 45;
+			
+		local glowx = rectx - glowradiusx; 
+		local glowy = recty - glowradiusy;
+		local gloww = ((rectendx + glowradiusx) - (rectx - glowradiusx)) / IMG_GLOW:getWidth();
+		local glowh = ((rectendy + glowradiusy) - (recty - glowradiusy)) / IMG_GLOW:getHeight();
 		love.graphics.draw(IMG_GLOW, glowx, glowy, 0, gloww, glowh);
 	else
 	end
+	love.graphics.setColor(r,g,b,a);
 	
-	--chain.draw(function()
+	if shape == 1 or not shape then
 		love.graphics.rectangle("fill", rectx, recty, rectw, recth);
-	--end)
+	
+	-- diamond
+	elseif shape == 2 then
+		love.graphics.polygon( "fill", 
+			rectx, (recty + rectendy) / 2,
+			(rectx + rectendx) / 2, recty,
+			rectendx, (recty + rectendy) / 2,
+			(rectx + rectendx) / 2, rectendy
+		)
+	-- left pointing triangle
+	elseif shape == 3 then
+		love.graphics.polygon( "fill", 
+			rectx, (recty + rectendy) / 2,
+			rectendx, recty,
+			rectendx, rectendy
+		)
+	
+	-- right pointing triangle
+	elseif shape == 4 then
+		love.graphics.polygon( "fill", 
+			rectx, recty,
+			rectx, rectendy,
+			rectendx, (recty + rectendy) / 2
+		)
+	end
 end
 
 function pianoroll_trax(x, lyr)
