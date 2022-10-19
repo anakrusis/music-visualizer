@@ -13,7 +13,7 @@ ACTIVE_CHANNELS = {
 	false, false, true,  true,  true,  true,  true,
 	false, false, false, false, false, false, false
 }
-OFFSET = -6;
+OFFSET = -1;--6;
 BEATS_PER_MINUTE = 140.19;
 rowsperminute 	= BEATS_PER_MINUTE * ROWS_PER_BEAT;
 ticksperminute 	= rowsperminute * TICKS_PER_ROW;
@@ -132,7 +132,7 @@ local moonshine = require 'moonshine'
 
 function love.load()
 	love.window.setTitle("Music Visualizer");
-	success = love.window.setMode( 800, 800, {fullscreen=true, minwidth=800, minheight=600} )
+	success = love.window.setMode( 1500, 1020, {fullscreen=false, minwidth=800, minheight=600} )
 	
 	chain = moonshine.chain(moonshine.effects.glow)
 	chain.glow.min_luma = 0.5;
@@ -144,7 +144,10 @@ function love.load()
 	IMG_GLOW	= love.graphics.newImage("assets/sqrglow.png");
 	IMG_TITLE	= love.graphics.newImage("assets/title.png");
 	SPRITES		= {
-		KING = love.graphics.newImage("assets/wK.png");
+		KL = love.graphics.newImage("assets/wK.png"), -- king large (main theme)
+		QL = love.graphics.newImage("assets/wQ.png"), -- queen large
+		RL = love.graphics.newImage("assets/wR.png"), -- rook large
+		NL = love.graphics.newImage("assets/wN.png"), -- knight large
 	}
 	
 	spritechanges = {
@@ -152,11 +155,11 @@ function love.load()
 		{},{},{},{},{},{},{},
 		{},{},
 		-- -- voice 1
-		{},
+		{{-5, SPRITES.KL}, {2320, false}, {3080, SPRITES.QL}},
 		-- voice 2
-		{{0, }},
+		{{-5, SPRITES.KL}, {1473, SPRITES.NL}, {2320, false}, {3080, SPRITES.NL}},
 		-- voice 3
-		{},
+		{{3064, SPRITES.KL}},
 		-- voice 4
 		{},
 		-- supplementary voice "5"
@@ -204,7 +207,7 @@ function love.load()
 		currentnote[j] = {};
 	end
 	
-	for i = 1, 102 do
+	for i = 1, 103 do
 		--print("parsing pattern " .. PATTERN_ORDER[i]);
 		-- this first line only indicates the number of rows to the pattern
 		-- TODO: I assumed that every line is 64 rows long, which in reality can vary freely
@@ -291,6 +294,16 @@ function parseLine(patternpos, patternsize, rowpos, rowdata)
 							end
 						end
 					end
+					local csprite = false;
+					local schanges = spritechanges[channelnum];
+					-- iterates through sprite changes to see if any apply
+					if schanges then
+						for q = 1, #schanges do
+							if schanges[q][1] < currtick then
+								csprite = schanges[q][2];
+							end
+						end
+					end
 
 					local NewNote = {
 						pitchclass = SEMITONE_VALUES[pitchclassstring],
@@ -303,7 +316,8 @@ function parseLine(patternpos, patternsize, rowpos, rowdata)
 						-- this will turn true on note onset during playback
 						glow = false,
 						color = notecolor,
-						squareshape = true
+						squareshape = true,
+						sprite = csprite
 					};
 					currentnote[channelnum] = NewNote;
 					table.insert(CHANNELS[channelnum], NewNote);
@@ -467,7 +481,7 @@ function love.draw()
 	end
 	
 	-- now line
-	--love.graphics.line(WINDOW_WIDTH/2, 0, WINDOW_WIDTH/2, WINDOW_HEIGHT);
+	love.graphics.line(WINDOW_WIDTH/2, 0, WINDOW_WIDTH/2, WINDOW_HEIGHT);
 
 	-- left and right bounds of screen for each parallax layer
 	leftbounds = {}; rightbounds = {};
@@ -491,7 +505,7 @@ function love.draw()
 	
 	local opacity = 4 - (currentframe / 95);
 	love.graphics.setColor(1,1,1, opacity);
-	love.graphics.draw(IMG_TITLE);
+	--love.graphics.draw(IMG_TITLE);
 	
 	love.graphics.print("Notes drawn: " .. notesdrawn)
 end
@@ -540,6 +554,11 @@ function drawNote(chnum, notenum)
 			-- if i == 1 and not currnote.squareshape then shape = 3 end
 			drawTraRect(cx, pitch, initialnoteend - cx, 1, layer, cx < currentsongtick);
 			
+			-- can draw sprite at the first segment
+			if (cx < currentsongtick and initialnoteend > currentsongtick) then
+				drawSprite(currnote.sprite, pitch, layer)
+			end
+			
 			cx = initialnoteend;
 			-- now a set of rectangles acting as segments of the ebnd
 			for q = 1, BEND_SEGMENTS do
@@ -552,13 +571,17 @@ function drawNote(chnum, notenum)
 				pitch = basepitch + (ycoeff * math.cos( math.pi * ( 1 / BEND_SEGMENTS ) * q )) + offset;
 				
 				drawTraRect(cx, pitch, SEGMENT_WIDTH, 1, layer);
+				
+				-- can draw sprites in this between part too
+				if (cx < currentsongtick and cx+SEGMENT_WIDTH > currentsongtick) then
+					drawSprite(currnote.sprite, pitch, layer)
+				end
+				
 				cx = cx + SEGMENT_WIDTH;
 			end
-			--pitch = pitch + (cb[1] / (BEND_SEGMENTS + 1));
 			
 			pitch = basepitch + cb[1];
 			basepitch = pitch;
-			--cx = cb[2]
 			
 			-- after the last bend, we draw one more rect to the end of the note
 			if i == #currnote.bends then
@@ -566,6 +589,11 @@ function drawNote(chnum, notenum)
 				local shape;
 				if (currnote.squareshape) then shape = 1 else shape = 4 end
 				drawTraRect(cx, pitch, (currnote.endtick - 1) - cx, 1, layer, cx < currentsongtick, shape);
+				
+				-- and can draw sprites in the last segment too
+				if (cx < currentsongtick and currnote.endtick > currentsongtick) then
+					drawSprite(currnote.sprite, pitch, layer)
+				end
 			end
 		end
 		
@@ -576,7 +604,23 @@ function drawNote(chnum, notenum)
 	if (currnote.squareshape) then shape = 1 else shape = 4 end
 	drawTraRect(currnote.starttick, pitch, notelength-1, 1, layer, gl, shape);
 	
+	if (currnote.starttick < currentsongtick and currnote.endtick > currentsongtick) then
+		drawSprite(currnote.sprite, pitch, layer)
+	end
+	
 	notesdrawn = notesdrawn + 1;
+end
+
+function drawSprite(spr, y, layer)
+	if not spr then return end
+	
+	local spritedim = PIANOROLL_ZOOMY[layer] * 2
+	local sx = WINDOW_WIDTH/2 - (spritedim / 2);
+	local sy = pianoroll_tray(y, layer) - (spritedim / 2);
+		
+	local widthcoeff  = spritedim / spr:getHeight();
+	local heigthcoeff = spritedim / spr:getHeight();
+	love.graphics.draw(spr, sx, sy, 0, widthcoeff, heigthcoeff)
 end
 
 -- draw transformed rectangle

@@ -3,7 +3,7 @@ require("love.timer")
 TICKS_PER_ROW = 3;
 ROWS_PER_BEAT = 16;
 BEATS_PER_MINUTE = 140.19;
-OFFSET = -6; -- seconds before t=0 is hit
+OFFSET = -1; -- seconds before t=0 is hit
 
 rowsperminute 	= BEATS_PER_MINUTE * ROWS_PER_BEAT;
 ticksperminute 	= rowsperminute * TICKS_PER_ROW;
