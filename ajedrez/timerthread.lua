@@ -3,6 +3,7 @@ require("love.timer")
 TICKS_PER_ROW = 3;
 ROWS_PER_BEAT = 16;
 BEATS_PER_MINUTE = 140.19;
+OFFSET = -6; -- seconds before t=0 is hit
 
 rowsperminute 	= BEATS_PER_MINUTE * ROWS_PER_BEAT;
 ticksperminute 	= rowsperminute * TICKS_PER_ROW;
@@ -14,7 +15,7 @@ playing = true;
 starttime = love.timer.getTime();
 
 while true do
-	currenttime = love.timer.getTime() - starttime;
+	currenttime = OFFSET + (love.timer.getTime() - starttime);
 	
 	songtick = tickspersecond * currenttime;
 	love.thread.getChannel( 'songtick' ):push( songtick )

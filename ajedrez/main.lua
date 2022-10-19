@@ -13,6 +13,7 @@ ACTIVE_CHANNELS = {
 	false, false, true,  true,  true,  true,  true,
 	false, false, false, false, false, false, false
 }
+OFFSET = -6;
 BEATS_PER_MINUTE = 140.19;
 rowsperminute 	= BEATS_PER_MINUTE * ROWS_PER_BEAT;
 ticksperminute 	= rowsperminute * TICKS_PER_ROW;
@@ -131,7 +132,7 @@ local moonshine = require 'moonshine'
 
 function love.load()
 	love.window.setTitle("Music Visualizer");
-	success = love.window.setMode( 1500, 800, {resizable=true, minwidth=800, minheight=600} )
+	success = love.window.setMode( 800, 800, {fullscreen=true, minwidth=800, minheight=600} )
 	
 	chain = moonshine.chain(moonshine.effects.glow)
 	chain.glow.min_luma = 0.5;
@@ -141,6 +142,27 @@ function love.load()
 	audiosource = love.audio.newSource( "assets/song.wav", "stream" )
 	
 	IMG_GLOW	= love.graphics.newImage("assets/sqrglow.png");
+	IMG_TITLE	= love.graphics.newImage("assets/title.png");
+	SPRITES		= {
+		KING = love.graphics.newImage("assets/wK.png");
+	}
+	
+	spritechanges = {
+		{},{},{},{},{},{},{},
+		{},{},{},{},{},{},{},
+		{},{},
+		-- -- voice 1
+		{},
+		-- voice 2
+		{{0, }},
+		-- voice 3
+		{},
+		-- voice 4
+		{},
+		-- supplementary voice "5"
+		{}
+	}
+	
 	
 	local inlines = {};
 	for line in io.lines("data/rrr.txt") do
@@ -301,8 +323,8 @@ function parseLine(patternpos, patternsize, rowpos, rowdata)
 				-- theres literally one orch hit... im gonna display it up an octave so the glow fx dont stack oddly
 				if currchar .. nextchar == "33" then
 					if currentnote[channelnum] then
-						currentnote[channelnum].octave = currentnote[channelnum].octave + 1; -- add ++ please lua im beging you
-						currentnote[channelnum].color = COLORS.NONE; currentnote[channelnum].squareshape = false;
+						--currentnote[channelnum].octave = currentnote[channelnum].octave + 1; -- add ++ please lua im beging you
+						--currentnote[channelnum].color = COLORS.NONE; currentnote[channelnum].squareshape = false;
 					end
 				end
 			end
@@ -341,7 +363,6 @@ function love.keypressed(key, scancode, isrepeat)
 	if key == "space" and not rendering then
 		playing = not playing;
 		timerthread:start()
-		audiosource:play();
 	end
 	if key == "r" and not playing then
 		--audiosource:play();
@@ -372,9 +393,13 @@ function love.update(dt)
 			PIANOROLL_SCROLLX = currentsongtick;
 		end
 		
+		if playing then
+			currentframe = currentframe + 1;
+		end
+		
 	-- rendering
 	else
-		currentsongtick = tickspersecond * ( currentframe / 60 );
+		currentsongtick = tickspersecond * (OFFSET + ( currentframe / 60 ));
 		PIANOROLL_SCROLLX = currentsongtick;
 		
 		love.graphics.captureScreenshot( screenshotFinished )
@@ -426,7 +451,8 @@ end
 function love.draw()
 	WINDOW_WIDTH  = love.graphics.getWidth();
 	WINDOW_HEIGHT = love.graphics.getHeight();
-
+	
+	love.graphics.setColor(1,1,1);
 	love.graphics.print("Current FPS: "..tostring(love.timer.getFPS( )), 10, 15)
 	love.graphics.print("frametick: " .. currentframe, 10, 30);
 	love.graphics.print("songtick: " .. currentsongtick, 10, 45);
@@ -441,7 +467,7 @@ function love.draw()
 	end
 	
 	-- now line
-	love.graphics.line(WINDOW_WIDTH/2, 0, WINDOW_WIDTH/2, WINDOW_HEIGHT);
+	--love.graphics.line(WINDOW_WIDTH/2, 0, WINDOW_WIDTH/2, WINDOW_HEIGHT);
 
 	-- left and right bounds of screen for each parallax layer
 	leftbounds = {}; rightbounds = {};
@@ -462,6 +488,10 @@ function love.draw()
 			end
 		end
 	end
+	
+	local opacity = 4 - (currentframe / 95);
+	love.graphics.setColor(1,1,1, opacity);
+	love.graphics.draw(IMG_TITLE);
 	
 	love.graphics.print("Notes drawn: " .. notesdrawn)
 end
@@ -505,10 +535,10 @@ function drawNote(chnum, notenum)
 			initialnoteend = cb[2] - ((1/2) * BEND_SEGMENTS * SEGMENT_WIDTH );
 			-- first, the rectangle that comes before the bend
 			if (cx < currentsongtick) then love.graphics.setColor(lightcolor) else love.graphics.setColor(darkcolor) end
-			local shape;
-			-- the first segment of a bendy note can have a special onset shape
-			if i == 1 and not currnote.squareshape then shape = 3 end
-			drawTraRect(cx, pitch, initialnoteend - cx, 1, layer, cx < currentsongtick, shape);
+			-- local shape;
+			-- -- the first segment of a bendy note can have a special onset shape
+			-- if i == 1 and not currnote.squareshape then shape = 3 end
+			drawTraRect(cx, pitch, initialnoteend - cx, 1, layer, cx < currentsongtick);
 			
 			cx = initialnoteend;
 			-- now a set of rectangles acting as segments of the ebnd
@@ -543,7 +573,7 @@ function drawNote(chnum, notenum)
 	end
 	-- non bending notes just get the regular single rectangle
 	local shape;
-	if (currnote.squareshape) then shape = 1 else shape = 2 end
+	if (currnote.squareshape) then shape = 1 else shape = 4 end
 	drawTraRect(currnote.starttick, pitch, notelength-1, 1, layer, gl, shape);
 	
 	notesdrawn = notesdrawn + 1;
