@@ -13,7 +13,7 @@ ACTIVE_CHANNELS = {
 	false, false, true,  true,  true,  true,  true,
 	false, false, false, false, false, false, false
 }
-OFFSET = -1;--6;
+OFFSET = -5;
 BEATS_PER_MINUTE = 140.19;
 rowsperminute 	= BEATS_PER_MINUTE * ROWS_PER_BEAT;
 ticksperminute 	= rowsperminute * TICKS_PER_ROW;
@@ -29,11 +29,17 @@ OCTAVE_DIFFS = {
 BEND_SEGMENTS = 16;
 SEGMENT_WIDTH = 0.25;
 NOW_LINE = false;
+DEBUG_TEXT = false;
 
 PIANOROLL_ZOOMX = {2, 2.5, 3, 3.5, 4};
 PIANOROLL_ZOOMY = {11, 12, 16, 18, 20};
 PIANOROLL_SCROLLX = 0;
 PIANOROLL_SCROLLY = 0;
+
+local zoomycoeff = 1.15
+for i = 1, #PIANOROLL_ZOOMY do
+	PIANOROLL_ZOOMY[i] = PIANOROLL_ZOOMY[i] * zoomycoeff;
+end
 
 PARALLAX_LAYERS = {
 	1, 2, 2, 2, 2, 2, 2,
@@ -80,46 +86,14 @@ colorchanges = {
 	{},{},
 	-- -- voice 1
 	{},
-	-- {
-	-- {1530, COLORS.THEME1}, {2400, COLORS.NONE}, {2609, COLORS.MOTIF2}, {2794, COLORS.NONE},
-	-- {3072, COLORS.THEME3}, {3842, COLORS.NONE}, {3980, COLORS.MOTIF4}, {4049, COLORS.MOTIF2},
-	-- {4215, COLORS.MOTIF4}, {4278, COLORS.NONE}, {4720, COLORS.MOTIF2}, {4863, COLORS.NONE},
-	-- {5377, COLORS.THEME4}, {6199, COLORS.MOTIF1}, {6394, COLORS.M1FRAG}, {6584, COLORS.MOTIF1},
-	-- {6754, COLORS.MOTIF5},
-	-- },
 	-- -- voice 2
 	{},
-	-- {
-	-- {1400, COLORS.THEME2}, {2320, COLORS.MOTIF2}, {2557,COLORS.NONE}, {3089, COLORS.THEME2}, 
-	-- {3860, COLORS.MOTIF2}, {4000, COLORS.MOTIF4}, {4120, COLORS.NONE}, 
-	-- {4281, COLORS.MOTIF1}, {4433, COLORS.MOTIF2},
-	-- {4484, COLORS.NONE}, {4623, COLORS.MOTIF2}, {4863, COLORS.NONE}, {5107, COLORS.MOTIF2},
-	-- {5239, COLORS.NONE},
-	-- {5377, COLORS.THEME3}, {6103, COLORS.NONE}, {6389, COLORS.MOTIF1}, {6540, COLORS.M1FRAG}, 
-	-- {6711, COLORS.NONE}, {6800, COLORS.MOTIF5}, {7092, COLORS.NONE}, {7290, COLORS.MOTIF4},
-	-- {7411, COLORS.MOTIF3},
-	-- },
 	-- -- voice 3
 	{},
-	-- {
-	-- {2971, COLORS.THEME1}, {4032, COLORS.M4FRAG}, {4145, COLORS.NONE}, {4315, COLORS.M4FRAG},
-	-- {4388, COLORS.NONE},
-	-- {5381, COLORS.THEME2}, 
-	-- {6186, COLORS.NONE},
-	-- {6289, COLORS.M1FRAG}, {6375, COLORS.NONE}, {6443, COLORS.M1FRAG}, {6520, COLORS.NONE},
-	-- {6680, COLORS.M1FRAG}, {6849, COLORS.MOTIF5}, {7065, COLORS.MOTIF1}, {7241, COLORS.MOTIF4},
-	-- {7331, COLORS.MOTIF5},
-	-- {7700, COLORS.THEME2},
-	
-	-- },
 	-- -- voice 4
 	{},
-	-- {
-	-- {5296, COLORS.THEME1}, {6180, COLORS.MOTIF3}, {6755, COLORS.NONE}, {7197, COLORS.MOTIF4},
-	-- {7628, COLORS.THEME1}
-	-- },
 	-- -- supplementary voice "5"
-	-- {}
+	{}
 }
 
 -- playback properties
@@ -173,7 +147,7 @@ function love.load()
 		-- voice 2
 		{
 		{-5, SPRITES.KL}, {1473, SPRITES.NL}, {2320, false}, {3080, SPRITES.NL},
-		{3860, false}, {5360, SPRITES.QL}, {6100, false}, {11531, SPRITES.QL},
+		{3860, false}, {5360, SPRITES.QL}, {6100, false}, {11531, SPRITES.QS},
 		{12307, SPRITES.KL}, {13116, SPRITES.KS}, {13813, SPRITES.KL}, 
 		{15110, false}, {15563, SPRITES.RS}, {15944, false},
 		{16111, SPRITES.KL},
@@ -421,7 +395,6 @@ end
 
 function love.resize( width, height )
 	print(("Window resized to width: %d and height: %d."):format(width, height))
-	chain = chain.resize(width, height)
 end
 
 function love.update(dt)
@@ -505,12 +478,14 @@ function love.draw()
 	WINDOW_WIDTH  = love.graphics.getWidth();
 	WINDOW_HEIGHT = love.graphics.getHeight();
 	
-	love.graphics.setColor(1,1,1);
-	love.graphics.print("Current FPS: "..tostring(love.timer.getFPS( )), 10, 15)
-	love.graphics.print("frametick: " .. currentframe, 10, 30);
-	love.graphics.print("songtick: " .. currentsongtick, 10, 45);
-	love.graphics.print("campos: " .. piano_roll_untrax(WINDOW_WIDTH/2, 2),10,60);
-
+	if DEBUG_TEXT then
+		love.graphics.setColor(1,1,1);
+		love.graphics.print("Current FPS: "..tostring(love.timer.getFPS( )), 10, 15)
+		love.graphics.print("frametick: " .. currentframe, 10, 30);
+		love.graphics.print("songtick: " .. currentsongtick, 10, 45);
+		love.graphics.print("campos: " .. piano_roll_untrax(WINDOW_WIDTH/2, 2),10,60);
+	end
+	
 	love.graphics.setColor(1,1,1)
 	-- every other beat is marked (32 ticks is two beats long)
 	local pixelsperbeat = 32 * PIANOROLL_ZOOMX[2] * 3
@@ -544,11 +519,13 @@ function love.draw()
 		end
 	end
 	
-	local opacity = 4 - (currentframe / 95);
+	local opacity = 2.7 - (currentframe / 120);
 	love.graphics.setColor(1,1,1, opacity);
-	--love.graphics.draw(IMG_TITLE);
+	love.graphics.draw(IMG_TITLE);
 	
-	love.graphics.print("Notes drawn: " .. notesdrawn)
+	if DEBUG_TEXT then
+		love.graphics.print("Notes drawn: " .. notesdrawn)
+	end
 end
 
 function drawNote(chnum, notenum)
@@ -659,7 +636,7 @@ function drawSprite(spr, y, layer)
 	local sx = WINDOW_WIDTH/2 - (spritedim / 2);
 	local sy = pianoroll_tray(y, layer) - (spritedim / 2);
 		
-	local widthcoeff  = spritedim / spr:getHeight();
+	local widthcoeff  = spritedim / spr:getWidth();
 	local heigthcoeff = spritedim / spr:getHeight();
 	love.graphics.draw(spr, sx, sy, 0, widthcoeff, heigthcoeff)
 end
@@ -721,11 +698,11 @@ function pianoroll_trax(x, lyr)
 	return PIANOROLL_ZOOMX[lyr] * (x - PIANOROLL_SCROLLX) + (WINDOW_WIDTH / 2); 
 end
 function pianoroll_tray(y, lyr)
-	return PIANOROLL_ZOOMY[lyr] * (50 - y - PIANOROLL_SCROLLY ) + (WINDOW_HEIGHT / 2); 
+	return PIANOROLL_ZOOMY[lyr] * (52 - y - PIANOROLL_SCROLLY ) + (WINDOW_HEIGHT / 2); 
 end
 function piano_roll_untrax(x, lyr)
 	return ((x - (WINDOW_WIDTH / 2) ) / PIANOROLL_ZOOMX[lyr]) + PIANOROLL_SCROLLX;
 end
 function piano_roll_untray(y, lyr)
-	return -((( y - ( WINDOW_HEIGHT / 2 ) ) / PIANOROLL_ZOOMY[lyr] ) + PIANOROLL_SCROLLY) + 50
+	return -((( y - ( WINDOW_HEIGHT / 2 ) ) / PIANOROLL_ZOOMY[lyr] ) + PIANOROLL_SCROLLY) + 52
 end
