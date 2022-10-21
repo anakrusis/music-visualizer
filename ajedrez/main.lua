@@ -28,6 +28,7 @@ OCTAVE_DIFFS = {
 -- how many intermediate rectangles to draw between the notes in a bend
 BEND_SEGMENTS = 16;
 SEGMENT_WIDTH = 0.25;
+NOW_LINE = false;
 
 PIANOROLL_ZOOMX = {2, 2.5, 3, 3.5, 4};
 PIANOROLL_ZOOMY = {11, 12, 16, 18, 20};
@@ -132,10 +133,8 @@ local moonshine = require 'moonshine'
 
 function love.load()
 	love.window.setTitle("Music Visualizer");
-	success = love.window.setMode( 1500, 1020, {fullscreen=false, minwidth=800, minheight=600} )
-	
-	chain = moonshine.chain(moonshine.effects.glow)
-	chain.glow.min_luma = 0.5;
+	success = love.window.setMode( 1500, 1020, {fullscreen=true, minwidth=800, minheight=600} )
+	love.graphics.setDefaultFilter( "nearest", "nearest");
 	
 	timerthread = love.thread.newThread( "timerthread.lua" )
 	
@@ -144,10 +143,17 @@ function love.load()
 	IMG_GLOW	= love.graphics.newImage("assets/sqrglow.png");
 	IMG_TITLE	= love.graphics.newImage("assets/title.png");
 	SPRITES		= {
-		KL = love.graphics.newImage("assets/wK.png"), -- king large (main theme)
+		-- substantial theme portions
+		KL = love.graphics.newImage("assets/wK.png"), -- king large (main subject)
 		QL = love.graphics.newImage("assets/wQ.png"), -- queen large
 		RL = love.graphics.newImage("assets/wR.png"), -- rook large
 		NL = love.graphics.newImage("assets/wN.png"), -- knight large
+		
+		-- insubstantial theme fragments
+		KS = love.graphics.newImage("assets/wKSmall.png"), -- king small
+		QS = love.graphics.newImage("assets/wQSmall.png"), -- queen small
+		RS = love.graphics.newImage("assets/wRSmall.png"), -- rook small
+		NS = love.graphics.newImage("assets/wNSmall.png"), -- knight small
 	}
 	
 	spritechanges = {
@@ -155,15 +161,40 @@ function love.load()
 		{},{},{},{},{},{},{},
 		{},{},
 		-- -- voice 1
-		{{-5, SPRITES.KL}, {2320, false}, {3080, SPRITES.QL}},
+		{
+		{1530, SPRITES.KL}, {2320, false}, {3080, SPRITES.QL}, {3860, false},
+		{5360, SPRITES.RL}, {6180, false}, {7904, SPRITES.KS}, {8261, false}, 
+		{8636, SPRITES.KS}, {9308, SPRITES.KS}, {9655, false},
+		{9785, SPRITES.KS}, {11336, false}, {12107, SPRITES.QS}, {12260, false},
+		{12690, SPRITES.NS}, {12945, false}, {13111, SPRITES.RS},{13916, SPRITES.KS},
+		{14776, SPRITES.QL},
+		{15416, SPRITES.RS}, {15879, false}, {16136, SPRITES.NL},
+		},
 		-- voice 2
-		{{-5, SPRITES.KL}, {1473, SPRITES.NL}, {2320, false}, {3080, SPRITES.NL}},
+		{
+		{-5, SPRITES.KL}, {1473, SPRITES.NL}, {2320, false}, {3080, SPRITES.NL},
+		{3860, false}, {5360, SPRITES.QL}, {6100, false}, {11531, SPRITES.QL},
+		{12307, SPRITES.KL}, {13116, SPRITES.KS}, {13813, SPRITES.KL}, 
+		{15110, false}, {15563, SPRITES.RS}, {15944, false},
+		{16111, SPRITES.KL},
+		},
 		-- voice 3
-		{{3064, SPRITES.KL}},
+		{
+		{3064, SPRITES.KL},{4074, false},{5360, SPRITES.NL}, {6180, false},
+		{7673, SPRITES.NL}, {8275, false}, {9213, SPRITES.KS}, {9655, false},
+		{9882, SPRITES.KS}, {11380, false}, {11540, SPRITES.NL}, {12178, false},
+		{14604, SPRITES.KS}, {15991, false}, {16136, SPRITES.RL},
+		},
 		-- voice 4
-		{},
+		{
+		{5360, SPRITES.KL},{6180, false},{7673, SPRITES.KL},{8469, false},
+		{8824, SPRITES.KS}, {9401, SPRITES.KL}, {10000, SPRITES.KS},
+		{10677, false},{11721, SPRITES.QS},{11906, false},
+		{12307, SPRITES.NL},{12652, false},{13916, SPRITES.KS},{14604, SPRITES.QL},
+		{15374, SPRITES.NL}, {15991, false}, {16136, SPRITES.QL},
+		},
 		-- supplementary voice "5"
-		{}
+		{{12934, SPRITES.KS}, {13105, false}}
 	}
 	
 	
@@ -397,18 +428,26 @@ function love.update(dt)
 	-- real time playback
 	-- (cannot go on at the same time as rendering)
 	if not rendering then
+		local lastsongtick = 0;
 		local stchan = love.thread.getChannel( 'songtick' );
 		local s;
 		for i = 1, stchan:getCount() do 
 			s = stchan:pop();
 		end
 		if s then
+			lastsongtick = currentsongtick;
 			currentsongtick = s;
 			PIANOROLL_SCROLLX = currentsongtick;
 		end
 		
 		if playing then
+			lastframe = currentframe;
 			currentframe = currentframe + 1;
+			
+			-- whatever tick that crosses the zero line gets to start the audio playback
+			if lastsongtick < 0 and currentsongtick >= 0 then
+				audiosource:play();
+			end
 		end
 		
 	-- rendering
@@ -481,7 +520,9 @@ function love.draw()
 	end
 	
 	-- now line
-	love.graphics.line(WINDOW_WIDTH/2, 0, WINDOW_WIDTH/2, WINDOW_HEIGHT);
+	if NOW_LINE then
+		love.graphics.line(WINDOW_WIDTH/2, 0, WINDOW_WIDTH/2, WINDOW_HEIGHT);
+	end
 
 	-- left and right bounds of screen for each parallax layer
 	leftbounds = {}; rightbounds = {};
