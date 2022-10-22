@@ -574,7 +574,7 @@ function drawNote(chnum, notenum)
 			
 			-- can draw sprite at the first segment
 			if (cx < currentsongtick and initialnoteend > currentsongtick) then
-				drawSprite(currnote.sprite, pitch, layer)
+				drawSprite(currnote, pitch, layer)
 			end
 			
 			cx = initialnoteend;
@@ -592,7 +592,7 @@ function drawNote(chnum, notenum)
 				
 				-- can draw sprites in this between part too
 				if (cx < currentsongtick and cx+SEGMENT_WIDTH > currentsongtick) then
-					drawSprite(currnote.sprite, pitch, layer)
+					drawSprite(currnote, pitch, layer)
 				end
 				
 				cx = cx + SEGMENT_WIDTH;
@@ -610,7 +610,7 @@ function drawNote(chnum, notenum)
 				
 				-- and can draw sprites in the last segment too
 				if (cx < currentsongtick and currnote.endtick > currentsongtick) then
-					drawSprite(currnote.sprite, pitch, layer)
+					drawSprite(currnote, pitch, layer)
 				end
 			end
 		end
@@ -623,21 +623,29 @@ function drawNote(chnum, notenum)
 	drawTraRect(currnote.starttick, pitch, notelength-1, 1, layer, gl, shape);
 	
 	if (currnote.starttick < currentsongtick and currnote.endtick > currentsongtick) then
-		drawSprite(currnote.sprite, pitch, layer)
+		drawSprite(currnote, pitch, layer)
 	end
 	
 	notesdrawn = notesdrawn + 1;
 end
 
-function drawSprite(spr, y, layer)
+function drawSprite(note, y, layer)
+	local spr = note.sprite;
 	if not spr then return end
 	
 	local spritedim = PIANOROLL_ZOOMY[layer] * 2
 	local sx = WINDOW_WIDTH/2 - (spritedim / 2);
-	local sy = pianoroll_tray(y, layer) - (spritedim / 2);
+	
+	local sy = pianoroll_tray(y, layer) - (spritedim) + ((1/4) * spritedim);
 		
 	local widthcoeff  = spritedim / spr:getWidth();
 	local heigthcoeff = spritedim / spr:getHeight();
+	
+	sx = math.min(sx, pianoroll_trax(note.endtick,layer) - spr:getWidth() * widthcoeff );
+	
+	--love.graphics.setColor(1,1,1)
+	--love.graphics.rectangle("fill", sx, sy, spr:getWidth() * widthcoeff, spr:getHeight() * heigthcoeff);
+	
 	love.graphics.draw(spr, sx, sy, 0, widthcoeff, heigthcoeff)
 end
 
@@ -692,6 +700,9 @@ function drawTraRect(x,y,w,h,layer,glow,shape)
 			rectendx, (recty + rectendy) / 2
 		)
 	end
+	
+	--love.graphics.setColor(1,0,0)
+	--love.graphics.line(rectx,(recty+rectendy)/2,rectx+rectw,(recty+rectendy)/2)
 end
 
 function pianoroll_trax(x, lyr)
